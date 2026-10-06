@@ -1,0 +1,28 @@
+collapseCells
+  ok  [1,2,3,5,9,10] -> 01-03,05,09-10
+  ok  [7] -> 07 (single stays single)
+  ok  [1,2,3,4,7,14,18,19,20] -> 01-04,07,14,18-20
+  ok  pair collapses: [9,10] -> 09-10
+  ok  unsorted input sorted NUMERICALLY: [10,9,2,1] -> 01-02,09-10
+  ok  lexicographic trap: [2,10,11,3] -> 02-03,10-11
+  ok  duplicates removed: [5,5,6,6] -> 05-06
+  ok  no runs: [1,3,5] -> 01,03,05
+  ok  three digits keep their width: [99,100,101] -> 99-101
+  ok  empty -> ''
+  ok  rejects '3' (string)
+  ok  rejects 2.5
+  ok  rejects -1
+  ok  rejects NaN
+expandCells
+  ok  '01-03,05,09-10' -> [1,2,3,5,9,10]
+  ok  rejects '05-03'
+  ok  rejects '0x'
+round trip: 2000 random sets, expand(collapse(s)) == sorted unique s
+  ok  random round trip
+buildLines
+  ok  one line per sheet per name, unknown last, sheets natural-ordered
+  ok  nothing ruled -> no lines
+parseLines
+  ok  parses own output back, ignores comments/blank, reports junk
+
+ALL 21 TESTS PASSED

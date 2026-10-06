@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Charpass Review</title>
+<style>
+:root{
+  --bg:#101115; --panel:#181a20; --panel2:#1f222a; --line:#2c303a;
+  --text:#ebeef5; --muted:#8b91a1; --accent:#f5e500; --green:#78e696; --red:#ff6b6b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:14px/1.4 "Segoe UI",system-ui,sans-serif}
+kbd{display:inline-block;min-width:1.6em;padding:1px 5px;border:1px solid var(--line);
+  border-bottom-width:2px;border-radius:4px;background:var(--panel2);color:var(--accent);
+  font:600 12px/1.3 Consolas,monospace;text-align:center}
+button{font:inherit;color:var(--bg);background:var(--accent);border:0;border-radius:4px;
+  padding:6px 12px;font-weight:600;cursor:pointer}
+button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+#app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
+header{display:flex;gap:18px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line)}
+header h1{font-size:15px;margin:0;color:var(--accent);letter-spacing:.04em}
+#where{font:600 15px Consolas,monospace}
+#prog{flex:1;display:flex;align-items:center;gap:10px;min-width:200px}
+#bar{flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden}
+#bar>div{height:100%;background:var(--green);width:0}
+#counts{color:var(--muted);white-space:nowrap}
+#unsaved{white-space:nowrap}
+#unsaved.warn{color:var(--accent)}
+main{display:flex;flex-direction:column;gap:12px;padding:12px 16px;min-height:0}
+#frames{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:0 1 auto;min-height:0}
+.fr{position:relative;background:#000;border:1px solid var(--line);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0;
+  aspect-ratio:1;max-height:calc(100vh - 340px)}
+.fr img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.fr .lab{position:absolute;left:6px;top:4px;color:var(--muted);font:600 12px Consolas,monospace;
+  text-shadow:0 0 3px #000}
+.miss{color:var(--red);font:12px Consolas,monospace;padding:8px;word-break:break-all}
+#decide{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.4fr);gap:12px;flex:1 1 0;min-height:200px}
+#decide>.card{min-height:0;overflow:hidden}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.card h2{margin:0 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+#prop{font-size:26px;font-weight:700;letter-spacing:.02em}
+#prop.none{color:var(--muted);font-size:18px}
+#prop.rejected{color:var(--muted);text-decoration:line-through}
+#meta{color:var(--muted);font:12px Consolas,monospace;margin-top:4px}
+#status{margin-top:8px;font-weight:700;font-size:16px;min-height:1.4em}
+#status.named{color:var(--green)} #status.unknown{color:var(--accent)} #status.open{color:var(--muted)}
+#filterbox{font:600 18px Consolas,monospace;padding:6px 8px;border:1px solid var(--line);
+  border-radius:4px;background:var(--bg);min-height:36px}
+#filterbox.active{border-color:var(--accent)}
+#filterbox .ph{color:var(--muted);font-weight:400;font-size:14px}
+#filterbox .caret{display:inline-block;width:9px;height:1.05em;background:var(--accent);
+  vertical-align:text-bottom;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+#cands{list-style:none;margin:6px 0 0;padding:0;max-height:calc(100% - 70px);overflow:auto}
+#cands li{padding:3px 8px;border-radius:3px;font-weight:600}
+#cands li .al{color:var(--muted);font-weight:400}
+#cands li.sel{background:var(--accent);color:var(--bg)}
+#cands li.sel .al{color:#3a3a10}
+#refs{display:flex;flex-direction:column;min-height:0}
+#refname{font-size:18px;font-weight:700;color:var(--green);margin-bottom:6px}
+#refgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;overflow:auto;min-height:0}
+#refgrid img{width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--line);border-radius:3px;background:#000}
+#refnone{color:var(--muted)}
+footer{border-top:1px solid var(--line);padding:6px 16px;display:flex;flex-wrap:wrap;gap:4px 18px;color:var(--muted);font-size:13px}
+footer span{white-space:nowrap}
+#flash{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);font-size:40px;font-weight:800;
+  padding:10px 28px;border-radius:8px;background:rgba(16,17,21,.88);pointer-events:none;opacity:0;transition:opacity .25s}
+#flash.on{opacity:1;transition:none}
+#overlay{position:fixed;inset:0;background:rgba(8,9,12,.9);display:none;padding:28px;overflow:auto}
+#overlay.on{display:block}
+#ex{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
+#ex textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:4px;
+  font:13px/1.45 Consolas,monospace;padding:8px;resize:vertical}
+#ex textarea:focus{outline:1px solid var(--accent)}
+#exsum{color:var(--muted);margin:6px 0 10px;white-space:pre-line}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+#impmsg{white-space:pre-line;margin-top:8px;font:12px Consolas,monospace}
+#loader{max-width:640px;margin:12vh auto;padding:24px;display:none}
+#loader.on{display:block}
+#loader p{color:var(--muted)}
+#warnings{color:var(--accent);font:12px Consolas,monospace;white-space:pre-line}
+</style>
+</head>
+<body>
+<div id="loader" class="card">
+  <h2>Charpass Review</h2>
+  <p id="loadmsg">Looking for <b>review_data.js</b> / <b>review_data.json</b> beside this file…</p>
+  <div class="row"><button id="pick">Load review_data.json</button>
+  <span style="color:var(--muted)">or press <kbd>O</kbd></span></div>
+  <input type="file" id="file" accept=".json,.js,application/json" hidden>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <h1>CHARPASS REVIEW</h1>
+    <div id="where"></div>
+    <div id="prog"><div id="bar"><div></div></div><span id="counts"></span></div>
+    <span id="unsaved"></span>
+    <span id="dwarn" style="color:var(--accent);white-space:nowrap"></span>
+  </header>
+  <main>
+      <div id="frames"></div>
+      <div id="decide">
+        <div class="card">
+          <h2>Proposed</h2>
+          <div id="prop"></div>
+          <div id="meta"></div>
+          <div id="status"></div>
+          <div id="warnings"></div>
+        </div>
+        <div class="card">
+          <h2>Name — type to filter</h2>
+          <div id="filterbox"></div>
+          <ul id="cands"></ul>
+        </div>
+        <div id="refs" class="card">
+          <h2>Confirmed references</h2>
+          <div id="refname"></div>
+          <div id="refgrid"></div>
+          <div id="refnone"></div>
+        </div>
+      </div>
+  </main>
+  <footer id="keys"></footer>
+</div>
+
+<div id="overlay">
+  <div id="ex">
+    <div class="card">
+      <h2>Rulings — cells.txt lines</h2>
+      <div id="exsum"></div>
+      <textarea id="extext" rows="22" readonly></textarea>
+      <div class="row">
+        <button id="dl">Download .txt</button>
+        <button id="cp" class="ghost">Copy</button>
+        <span style="color:var(--muted)"><kbd>D</kbd> download · <kbd>C</kbd> copy · <kbd>Esc</kbd> close</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Restore / import</h2>
+      <p style="color:var(--muted);margin:0 0 6px">The downloaded file IS the backup. If this browser's storage
+      was cleared, paste it here (or load it) and apply: every
+      <code>SHEET/cells = NAME</code> line is ruled again on the matching cells.</p>
+      <textarea id="imptext" rows="10" placeholder="N047/01-04,07 = SHARK"></textarea>
+      <div class="row">
+        <button id="impgo">Apply import</button>
+        <button id="impfilebtn" class="ghost">Load .txt…</button>
+        <input type="file" id="impfile" accept=".txt,text/plain" hidden>
+      </div>
+      <div id="impmsg"></div>
+      <div class="row" id="orphanrow" style="display:none">
+        <span id="orphanmsg" style="color:var(--muted)"></span>
+        <button id="orphanclear" class="ghost">Forget them</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="flash"></div>
+
+<!-- Data: review_data.js sets window.REVIEW_DATA (works from file://, where
+     browsers refuse fetch() of a sibling .json). Missing file is fine. -->
+<script>window.REVIEW_DATA = undefined;</script>
+<script src="review_data.js"></script>
+<script>
+"use strict";
+// ===== BEGIN PURE (no DOM; extracted and unit-tested by test_review.js) =====
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+/** [1,2,3,5,9,10] -> "01-03,05,09-10". Numeric sort, de-duplicated,
+ *  consecutive runs (length >= 2) collapsed. Throws on anything that is not
+ *  a non-negative integer -- a bad cell must never be written silently. */
+function collapseCells(nums) {
+  const s = [...new Set(nums.map(function (n) {
+    if (typeof n !== "number" || !Number.isInteger(n) || n < 0)
+      throw new Error("bad cell number: " + JSON.stringify(n));
+    return n;
+  }))].sort(function (a, b) { return a - b; });
+  const out = [];
+  let i = 0;
+  while (i < s.length) {
+    let j = i;
+    while (j + 1 < s.length && s[j + 1] === s[j] + 1) j++;
+    out.push(j > i ? pad2(s[i]) + "-" + pad2(s[j]) : pad2(s[i]));
+    i = j + 1;
+  }
+  return out.join(",");
+}
+
+/** "01-03,05" -> [1,2,3,5]. Throws on malformed input. */
+function expandCells(str) {
+  const out = [];
+  str.split(",").forEach(function (part) {
+    part = part.trim();
+    if (!part) return;
+    const m = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(part);
+    if (!m) throw new Error("bad cell range: " + JSON.stringify(part));
+    const a = parseInt(m[1], 10), b = m[2] === undefined ? a : parseInt(m[2], 10);
+    if (b < a) throw new Error("descending range: " + part);
+    for (let k = a; k <= b; k++) out.push(k);
+  });
+  return out;
+}
+
+/** rulings: array of {sheet, cell, value}. One line per sheet per value;
+ *  sheets in natural order, names alphabetical, "unknown" last per sheet. */
+function buildLines(rulings) {
+  const by = new Map();
+  rulings.forEach(function (r) {
+    const k = r.sheet + "\u0000" + r.value;
+    if (!by.has(k)) by.set(k, { sheet: r.sheet, value: r.value, cells: [] });
+    by.get(k).cells.push(r.cell);
+  });
+  const groups = [...by.values()];
+  groups.sort(function (a, b) {
+    const s = a.sheet.localeCompare(b.sheet, "en", { numeric: true });
+    if (s) return s;
+    const au = a.value === "unknown", bu = b.value === "unknown";
+    if (au !== bu) return au ? 1 : -1;
+    return a.value.localeCompare(b.value, "en");
+  });
+  return groups.map(function (g) {
+    return g.sheet + "/" + collapseCells(g.cells) + " = " + g.value;
+  });
+}
+
+/** Parse cells.txt lines -> {ok:[{sheet,cell,value}], errors:[str]}.
+ *  '#' comments and blank lines ignored. */
+function parseLines(text) {
+  const ok = [], errors = [];
+  text.split(/\r?\n/).forEach(function (line, i) {
+    const t = line.replace(/#.*$/, "").trim();
+    if (!t) return;
+    const m = /^([A-Za-z]+\d+)\s*\/\s*([\d,\-\s]+?)\s*=\s*(.+?)\s*$/.exec(t);
+    if (!m) { errors.push("line " + (i + 1) + ": cannot parse: " + t); return; }
+    let cells;
+    try { cells = expandCells(m[2]); }
+    catch (e) { errors.push("line " + (i + 1) + ": " + e.message); return; }
+    cells.forEach(function (c) { ok.push({ sheet: m[1], cell: c, value: m[3] }); });
+  });
+  return { ok: ok, errors: errors };
+}
+// ===== END PURE =====
+
+const STORE_KEY = "charpassReview.v1";   // {rulings:{"N047/12":{v,id,t}}, pos, exported}
+const $ = function (id) { return document.getElementById(id); };
+let D = null;              // data
+let canon = new Map();     // UPPER name or alias -> roster name
+let idx = 0;               // current item
+let filter = "";           // typed filter
+let candSel = 0;
+let cands = [];
+let rejected = false;      // "2" pressed on this item
+let st = { rulings: {}, pos: null, exported: 0 };
+let storageOK = true;
+let orphanKeys = [];
+
+function itemKey(it) { return it.sheet + "/" + it.cell; }
+
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+        if (s && s.rulings) st = s; }
+  catch (e) { storageOK = false; }
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(st)); storageOK = true; }
+  catch (e) { storageOK = false; }
+}
+
+/** Rulings that apply to the CURRENT data: key present AND id still matches
+ *  (sheet codes are positional; a rebuilt sheet re-points cells). */
+function liveRuling(it) {
+  const r = st.rulings[itemKey(it)];
+  return r && r.id === it.id ? r : null;
+}
+
+function validate(data) {
+  const w = [];
+  if (!data || !Array.isArray(data.items) || !Array.isArray(data.roster))
+    throw new Error("review_data must have 'roster' (array) and 'items' (array)");
+  canon = new Map();
+  data.roster.forEach(function (n) { canon.set(String(n).toUpperCase(), n); });
+  Object.entries(data.aliases || {}).forEach(function (kv) {
+    if (canon.has(kv[1].toUpperCase())) canon.set(kv[0].toUpperCase(), canon.get(kv[1].toUpperCase()));
+    else w.push("alias " + kv[0] + " -> " + kv[1] + ": target not in roster, ignored");
+  });
+  const seen = new Set();
+  data.items.forEach(function (it, i) {
+    if (typeof it.sheet !== "string" || !Number.isInteger(it.cell) || typeof it.id !== "string")
+      throw new Error("item " + i + " needs sheet (string), cell (integer), id (string)");
+    const k = itemKey(it);
+    if (seen.has(k)) throw new Error("duplicate sheet/cell " + k + " (item " + i + ")");
+    seen.add(k);
+    it.frames = it.frames || [];
+    if (it.proposed != null) {
+      const c = canon.get(String(it.proposed).toUpperCase());
+      if (!c) { w.push(k + ": proposed '" + it.proposed + "' not in roster -- accept disabled"); it._prop = null; }
+      else it._prop = c;
+    } else it._prop = null;
+  });
+  data.refs = data.refs || {};
+  return w;
+}
+
+let loadWarnings = [];
+function start(data) {
+  D = data;
+  loadWarnings = validate(D);
+  load();
+  const keys = new Set(D.items.map(itemKey));
+  orphanKeys = Object.keys(st.rulings).filter(function (k) {
+    if (!keys.has(k)) return true;
+    const it = D.items.find(function (x) { return itemKey(x) === k; });
+    return st.rulings[k].id !== it.id;
+  });
+  const p = st.pos ? D.items.findIndex(function (x) { return itemKey(x) === st.pos; }) : -1;
+  idx = p >= 0 ? p : nextUnruled(-1);
+  if (idx < 0) idx = 0;
+  $("loader").classList.remove("on");
+  $("app").hidden = false;
+  renderKeys();
+  render();
+}
+
+// ---------- rendering ----------
+function imgEl(src, alt) {
+  const im = new Image();
+  im.alt = alt; im.src = src; im.decoding = "async";
+  im.onerror = function () {
+    const d = document.createElement("div");
+    d.className = "miss"; d.textContent = "missing: " + src;
+    im.replaceWith(d);
+  };
+  return im;
+}
+
+function counts() {
+  let named = 0, unk = 0;
+  D.items.forEach(function (it) {
+    const r = liveRuling(it);
+    if (r) { if (r.v === "unknown") unk++; else named++; }
+  });
+  return { named: named, unknown: unk, done: named + unk, total: D.items.length };
+}
+
+function render() {
+  const it = D.items[idx];
+  const c = counts();
+  $("where").textContent = itemKey(it) + "  ·  " + (idx + 1) + " / " + c.total;
+  $("bar").firstElementChild.style.width = (100 * c.done / Math.max(1, c.total)) + "%";
+  $("counts").textContent = c.done + " ruled (" + c.named + " named, " + c.unknown + " unknown) · "
+    + (c.total - c.done) + " open";
+  const pending = Math.max(0, c.done - (st.exported || 0));
+  $("unsaved").textContent = storageOK
+    ? (pending ? pending + " not yet downloaded" : "all downloaded")
+    : "⚠ browser storage unavailable — download often";
+  $("unsaved").className = (pending >= 50 || !storageOK) ? "warn" : "";
+
+  const fr = $("frames"); fr.textContent = "";
+  ["25%", "50%", "75%"].forEach(function (lab, i) {
+    const box = document.createElement("div"); box.className = "fr";
+    if (it.frames[i]) box.appendChild(imgEl(it.frames[i], lab));
+    else { const m = document.createElement("div"); m.className = "miss"; m.textContent = "no frame"; box.appendChild(m); }
+    const l = document.createElement("div"); l.className = "lab"; l.textContent = lab; box.appendChild(l);
+    fr.appendChild(box);
+  });
+
+  const prop = $("prop");
+  prop.className = it._prop ? (rejected ? "rejected" : "") : "none";
+  prop.textContent = it._prop || (it.proposed ? it.proposed + " (not in roster)" : "no proposal");
+  const meta = ["id " + it.id];
+  if (typeof it.distance === "number") meta.push("dist " + it.distance.toFixed(3));
+  if (it.agreement != null) meta.push("agreement " + it.agreement);
+  $("meta").textContent = meta.join("  ·  ");
+
+  const r = liveRuling(it), s = $("status");
+  if (!r) { s.className = "open"; s.textContent = "not yet ruled"; }
+  else if (r.v === "unknown") { s.className = "unknown"; s.textContent = "RULED: unknown"; }
+  else { s.className = "named"; s.textContent = "RULED: " + r.v; }
+  $("warnings").textContent = loadWarnings.filter(function (w) { return w.startsWith(itemKey(it) + ":"); }).join("\n");
+  $("dwarn").textContent = loadWarnings.length ? "⚠ " + loadWarnings.length + " data warning(s) — see export panel" : "";
+
+  renderFilter();
+  preload(idx + 1);
+}
+
+function renderFilter() {
+  const fb = $("filterbox");
+  fb.classList.toggle("active", !!filter || rejected);
+  fb.innerHTML = "";
+  if (filter) { fb.appendChild(document.createTextNode(filter)); }
+  else {
+    const ph = document.createElement("span"); ph.className = "ph";
+    ph.textContent = rejected ? "proposal rejected — type the right name  " : "start typing a name…  ";
+    fb.appendChild(ph);
+  }
+  const caret = document.createElement("span"); caret.className = "caret"; fb.appendChild(caret);
+
+  cands = filter ? match(filter) : [];
+  if (candSel >= cands.length) candSel = Math.max(0, cands.length - 1);
+  const ul = $("cands"); ul.textContent = "";
+  cands.slice(0, 40).forEach(function (cnd, i) {
+    const li = document.createElement("li");
+    li.textContent = cnd.name;
+    if (cnd.via) { const a = document.createElement("span"); a.className = "al"; a.textContent = "  (" + cnd.via + ")"; li.appendChild(a); }
+    if (i === candSel) li.className = "sel";
+    ul.appendChild(li);
+  });
+  if (filter && !cands.length) {
+    const li = document.createElement("li"); li.style.color = "var(--red)"; li.textContent = "no roster name matches";
+    ul.appendChild(li);
+  }
+  const sel = ul.querySelector(".sel"); if (sel) sel.scrollIntoView({ block: "nearest" });
+  renderRefs();
+}
+
+function match(q) {
+  q = q.toUpperCase();
+  const best = new Map();
+  canon.forEach(function (name, key) {
+    let sc = -1;
+    if (key.startsWith(q)) sc = 0;
+    else if (key.split(/[\s\-]+/).some(function (w) { return w.startsWith(q); })) sc = 1;
+    else if (key.includes(q)) sc = 2;
+    if (sc < 0) return;
+    const via = key === name.toUpperCase() ? "" : key.toLowerCase();
+    const prev = best.get(name);
+    if (!prev || sc < prev.sc || (sc === prev.sc && !via && prev.via)) best.set(name, { name: name, sc: sc, via: via });
+  });
+  return [...best.values()].sort(function (a, b) { return a.sc - b.sc || a.name.localeCompare(b.name); });
+}
+
+function renderRefs() {
+  const it = D.items[idx];
+  const name = cands.length ? cands[candSel].name : (rejected ? null : it._prop);
+  $("refname").textContent = name || "—";
+  const g = $("refgrid"); g.textContent = "";
+  const list = name ? (D.refs[name] || []) : [];
+  list.slice(0, 8).forEach(function (src) { g.appendChild(imgEl(src, name)); });
+  $("refnone").textContent = name && !list.length ? "no confirmed reference frames for " + name : "";
+}
+
+function preload(i) {
+  const it = D.items[i]; if (!it) return;
+  it.frames.forEach(function (s) { const im = new Image(); im.src = s; });
+}
+
+function renderKeys() {
+  const K = [
+    ["Enter", "accept proposal"], ["1", "accept"], ["2", "reject → type name"], ["3", "unknown"],
+    ["a–z", "filter names"], ["↑ ↓", "pick name"], ["Enter", "assign picked"], ["Esc", "clear filter"],
+    ["←", "back"], ["→", "skip"], [".", "next unruled"], ["Del", "clear ruling"], ["=", "export / restore"]
+  ];
+  const f = $("keys"); f.textContent = "";
+  K.forEach(function (k) {
+    const s = document.createElement("span");
+    const b = document.createElement("kbd"); b.textContent = k[0];
+    s.appendChild(b); s.appendChild(document.createTextNode(" " + k[1])); f.appendChild(s);
+  });
+}
+
+let flashT = 0;
+function flash(text, color) {
+  const f = $("flash"); f.textContent = text; f.style.color = color;
+  f.classList.add("on"); clearTimeout(flashT);
+  flashT = setTimeout(function () { f.classList.remove("on"); }, 350);
+}
+
+// ---------- actions ----------
+function rule(value) {
+  const it = D.items[idx];
+  st.rulings[itemKey(it)] = { v: value, id: it.id, t: Date.now() };
+  flash(value, value === "unknown" ? "var(--accent)" : "var(--green)");
+  go(idx + 1);
+}
+function clearRuling() {
+  const it = D.items[idx];
+  if (st.rulings[itemKey(it)]) { delete st.rulings[itemKey(it)]; flash("cleared", "var(--muted)"); }
+  save(); render();
+}
+function go(i) {
+  idx = Math.max(0, Math.min(D.items.length - 1, i));
+  filter = ""; candSel = 0; rejected = false;
+  st.pos = itemKey(D.items[idx]);
+  save(); render();
+}
+function nextUnruled(from) {
+  for (let k = 1; k <= D.items.length; k++) {
+    const i = (from + k) % D.items.length;
+    if (!liveRuling(D.items[i])) return i;
+  }
+  return -1;
+}
+
+function currentRulings() {
+  const out = [];
+  D.items.forEach(function (it) {
+    const r = liveRuling(it);
+    if (r) out.push({ sheet: it.sheet, cell: it.cell, value: r.v });
+  });
+  return out;
+}
+
+// ---------- export / import ----------
+function openExport() {
+  const rs = currentRulings();
+  const lines = buildLines(rs);
+  $("extext").value = lines.join("\n") + (lines.length ? "\n" : "");
+  const c = counts();
+  $("exsum").textContent = lines.length + " lines covering " + rs.length + " cells ("
+    + c.named + " named, " + c.unknown + " unknown). " + (c.total - c.done)
+    + " cells not ruled — they emit nothing.";
+  if (loadWarnings.length) $("exsum").textContent += "\n\nData warnings:\n" + loadWarnings.join("\n");
+  $("orphanrow").style.display = orphanKeys.length ? "flex" : "none";
+  $("orphanmsg").textContent = orphanKeys.length + " stored rulings don't match this data file "
+    + "(cell gone or re-pointed to another clip) and are NOT exported.";
+  $("overlay").classList.add("on");
+  $("dl").focus();
+}
+function closeExport() { $("overlay").classList.remove("on"); document.activeElement.blur(); render(); }
+function download() {
+  const txt = $("extext").value;
+  const d = new Date(), ts = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "-" + pad2(d.getHours()) + pad2(d.getMinutes());
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" }));
+  a.download = "review_rulings_" + ts + ".txt";
+  document.body.appendChild(a); a.click(); a.remove();
+  st.exported = counts().done; save();
+  flash("downloaded", "var(--green)");
+}
+function applyImport(text) {
+  const p = parseLines(text);
+  const byKey = new Map(D.items.map(function (it) { return [itemKey(it), it]; }));
+  let applied = 0, missing = 0;
+  const errs = p.errors.slice();
+  p.ok.forEach(function (r) {
+    const it = byKey.get(r.sheet + "/" + r.cell);
+    if (!it) { missing++; return; }
+    let v = r.value;
+    if (v.toLowerCase() === "unknown") v = "unknown";
+    else {
+      const c = canon.get(v.toUpperCase());
+      if (!c) { errs.push(r.sheet + "/" + pad2(r.cell) + ": '" + v + "' not in roster, skipped"); return; }
+      v = c;
+    }
+    st.rulings[itemKey(it)] = { v: v, id: it.id, t: Date.now() };
+    applied++;
+  });
+  save();
+  $("impmsg").textContent = "applied " + applied + " cells; " + missing + " cells not in this data file"
+    + (errs.length ? "\n" + errs.slice(0, 12).join("\n") + (errs.length > 12 ? "\n…" + (errs.length - 12) + " more" : "") : "");
+  $("impmsg").style.color = errs.length ? "var(--accent)" : "var(--green)";
+  openExport();
+}
+
+// ---------- keyboard ----------
+document.addEventListener("keydown", function (e) {
+  if (!D) {
+    if (e.key === "o" || e.key === "O" || e.key === "Enter") { e.preventDefault(); $("file").click(); }
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;     // leave browser shortcuts alone
+  const inField = /^(TEXTAREA|INPUT)$/.test(e.target.tagName) && !e.target.readOnly;
+
+  if ($("overlay").classList.contains("on")) {
+    if (e.key === "Escape") { e.preventDefault(); closeExport(); }
+    else if (!inField && (e.key === "d" || e.key === "D")) { e.preventDefault(); download(); }
+    else if (!inField && (e.key === "c" || e.key === "C")) { e.preventDefault(); copyOut(); }
+    return;
+  }
+  const it = D.items[idx];
+  const k = e.key;
+
+  if (filter) {
+    if (k === "Escape") { filter = ""; candSel = 0; }
+    else if (k === "Backspace") { filter = filter.slice(0, -1); candSel = 0; }
+    else if (k === "ArrowDown") { candSel = Math.min(candSel + 1, Math.max(0, cands.length - 1)); }
+    else if (k === "ArrowUp") { candSel = Math.max(candSel - 1, 0); }
+    else if (k === "Enter") { e.preventDefault(); if (cands.length) rule(cands[candSel].name); return; }
+    else if (k.length === 1 && /[A-Za-z \-']/.test(k)) { filter += k; candSel = 0; }
+    else return;
+    e.preventDefault(); renderFilter(); return;
+  }
+
+  if (k.length === 1 && /[A-Za-z]/.test(k)) { e.preventDefault(); filter = k; candSel = 0; renderFilter(); return; }
+  switch (k) {
+    case "Enter": case "1":
+      e.preventDefault();
+      if (it._prop && !rejected) rule(it._prop);
+      else flash(it._prop ? "rejected — type a name" : "no proposal", "var(--red)");
+      return;
+    case "2": e.preventDefault(); rejected = !rejected; render(); return;
+    case "3": e.preventDefault(); rule("unknown"); return;
+    case "ArrowLeft": case "Backspace": e.preventDefault(); go(idx - 1); return;
+    case "ArrowRight": e.preventDefault(); go(idx + 1); return;
+    case ".": { e.preventDefault(); const n = nextUnruled(idx);
+      if (n < 0) flash("all ruled", "var(--green)"); else go(n); return; }
+    case "Delete": e.preventDefault(); clearRuling(); return;
+    case "=": e.preventDefault(); openExport(); return;
+    case "Escape": if (rejected) { rejected = false; render(); } return;
+  }
+});
+
+function copyOut() {
+  const t = $("extext");
+  t.select();
+  (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject())
+    .catch(function () { document.execCommand("copy"); });
+  flash("copied", "var(--green)");
+}
+
+$("dl").onclick = download;
+$("cp").onclick = copyOut;
+$("impgo").onclick = function () { applyImport($("imptext").value); };
+$("impfilebtn").onclick = function () { $("impfile").click(); };
+$("impfile").onchange = function (e) {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(function (t) { $("imptext").value = t; applyImport(t); });
+};
+$("orphanclear").onclick = function () {
+  orphanKeys.forEach(function (k) { delete st.rulings[k]; });
+  orphanKeys = []; save(); openExport();
+};
+$("pick").onclick = function () { $("file").click(); };
+$("file").onchange = function (e) {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(function (t) {
+    try { start(JSON.parse(t.replace(/^\s*window\.REVIEW_DATA\s*=\s*/, "").replace(/;\s*$/, ""))); }
+    catch (err) { $("loadmsg").textContent = "Could not load: " + err.message; }
+  });
+};
+
+// ---------- boot ----------
+function fail(msg) { $("loader").classList.add("on"); if (msg) $("loadmsg").textContent = msg; }
+try {
+  if (window.REVIEW_DATA) start(window.REVIEW_DATA);
+  else fetch("review_data.json").then(function (r) {
+    if (!r.ok) throw new Error(r.status); return r.json();
+  }).then(function (data) {
+    try { start(data); } catch (err) { fail("review_data.json is invalid: " + err.message); }
+  }, function () {
+    fail("No review_data.js beside this page, and the browser refused to read review_data.json "
+      + "directly (normal for file://). Load the JSON by hand:");
+  });
+} catch (err) { fail("Could not start: " + err.message); }
+</script>
+</body>
+</html>
