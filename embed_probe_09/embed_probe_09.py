@@ -22,6 +22,10 @@ through the CCIP metrics head, plus a 5-round shuffled-label control)
   crop1       the single highest-confidence detection, padded, embedded.
   cropN       every detection (up to MAX_CROPS) embedded; clip-to-clip
               distance = min over all crop pairs.
+  content     whole frame with the letterbox bars cut off. The frames are 16:9
+              video padded to 448x448; a crop removes the bars as a side
+              effect, so this variant separates "bars gone" from "figure
+              cropped". If content alone moves the score, credit it there.
   cropN+full  as cropN, with the whole frame added as one more "crop".
               Extra variant: it cannot do worse than its parts by much and
               it tells you whether crops ADD to the frame or REPLACE it.
@@ -48,6 +52,11 @@ WHAT EACH OUTCOME WOULD MEAN
       background box per frame took two characters from 100% to 0%.
   aggregate flat but per-character table moving -> READ THE TABLE. In this
       project an aggregate has already hidden a +90 and a -11 in one run.
+
+USAGE
+  ag.cmd embed_probe_09.py [folder containing model_feat.onnx]
+  Without the argument it searches _index (skipping the frames folder) and the
+  Hugging Face cache, size-checked.
 
 READ-ONLY. Writes nothing to library.jsonl or anywhere in the index. The
 only file it writes is its own report, logs\\embed_probe_09.md.
@@ -91,6 +100,14 @@ MIN_BOX_SIDE = 4        # px in the 448 frame; smaller boxes are dropped as dege
 # its usual input. Squaring would put more background in the crop instead.
 PAD_FRAC = 0.15
 
+# Letterbox detection: a row/column is "bar" when its greyscale std is below
+# BAR_STD. Bars are only accepted when they are on BOTH sides and within
+# BAR_SYM px of each other -- a white-background character sheet has a
+# uniform top but not a matching bottom, and must not be cropped.
+BAR_STD = 4.0
+BAR_MIN = 6
+BAR_SYM = 6
+
 CONTROL_EXPECTED = 88.8
 CONTROL_TOL = 2.0
 MIN_CLIPS_PER_CHAR = 10
@@ -118,18 +135,49 @@ def model_candidates(*parts):
 
 
 def find_model(label, expected_bytes, cands):
+    """First candidate that exists AND has the exact byte size wins. A file
+    of the wrong size is reported, never used."""
+    wrong = []
     for p in cands:
         if p.is_file():
             size = p.stat().st_size
-            ok = "OK" if size == expected_bytes else f"MISMATCH (expected {expected_bytes:,})"
-            print(f"  {label}: {p}  {size:,} bytes  {ok}")
             if size != expected_bytes:
-                raise SystemExit(f"{label}: size mismatch -- partial or wrong download")
+                print(f"  {label}: {p}  {size:,} bytes  WRONG SIZE "
+                      f"(expected {expected_bytes:,}) -- skipped")
+                wrong.append(p)
+                continue
+            print(f"  {label}: {p}  {size:,} bytes  OK")
             return p
     print(f"  {label}: NOT FOUND. Looked in:")
     for p in cands:
         print(f"    {p}")
     raise SystemExit(f"{label} missing")
+
+
+def ccip_candidates(argv):
+    """Explicit folder first, then the fixed spots, then the Hugging Face
+    cache layout (models--deepghs--ccip_onnx/snapshots/<hash>/...), then
+    every model_feat.onnx under _index except the frames folder."""
+    sub = ("ccip-caformer_b36-24", "model_feat.onnx")
+    c = [Path(a) / "model_feat.onnx" for a in argv[1:2]]
+    c += model_candidates("ccip_onnx", *sub) + model_candidates(*sub)
+    hubs = [Path(os.environ[k]) / "hub" for k in ("HF_HOME",) if os.environ.get(k)]
+    if os.environ.get("HUGGINGFACE_HUB_CACHE"):
+        hubs.append(Path(os.environ["HUGGINGFACE_HUB_CACHE"]))
+    hubs.append(Path.home() / ".cache" / "huggingface" / "hub")
+    for h in hubs:
+        c += sorted(h.glob("models--deepghs--ccip_onnx/snapshots/*/" + "/".join(sub)))
+    if INDEX.is_dir():
+        for root, dirs, files in os.walk(INDEX):
+            dirs[:] = [d for d in dirs if d.lower() not in ("frames", "_superseded", "charpass")]
+            if "model_feat.onnx" in files:
+                c.append(Path(root) / "model_feat.onnx")
+    seen, out = set(), []
+    for p in c:
+        if str(p).lower() not in seen:
+            seen.add(str(p).lower())
+            out.append(p)
+    return out
 
 
 class Tee:
@@ -273,11 +321,38 @@ def det_input_size(sess):
     return (640, 640), "default 640 (no metadata, dynamic input)"
 
 
-def pad_box(box, W, H, pad=PAD_FRAC):
+def _bars(std):
+    """Leading/trailing low-variance run lengths of a 1-D std profile, kept
+    only if both exist and are near-equal (a real letterbox/pillarbox)."""
+    live = np.where(std >= BAR_STD)[0]
+    if not live.size:
+        return 0, 0
+    a, b = int(live[0]), int(len(std) - 1 - live[-1])
+    if a >= BAR_MIN and b >= BAR_MIN and abs(a - b) <= BAR_SYM:
+        return a, b
+    return 0, 0
+
+
+def content_box(img):
+    """(x0, y0, x1, y1) of the picture inside letterbox/pillarbox bars; the
+    whole image when there are none."""
+    g = np.asarray(img.convert("L"), dtype=np.float32)
+    H, W = g.shape
+    t, b = _bars(g.std(axis=1))
+    l, r = _bars(g.std(axis=0))
+    return (l, t, W - r, H - b)
+
+
+def pad_box(box, W, H, pad=PAD_FRAC, bounds=None):
+    """Grow the box by `pad` of its own size per side, then clip to
+    `bounds` (the content box) so padding never pulls in letterbox bars."""
+    bx0, by0, bx1, by1 = bounds if bounds else (0, 0, W, H)
     x0, y0, x1, y1 = box[:4]
-    w, h = x1 - x0, y1 - y0
-    x0, x1 = max(0.0, x0 - pad * w), min(float(W), x1 + pad * w)
-    y0, y1 = max(0.0, y0 - pad * h), min(float(H), y1 + pad * h)
+    x0, x1 = max(x0, bx0), min(x1, bx1)
+    y0, y1 = max(y0, by0), min(y1, by1)
+    w, h = max(x1 - x0, 1.0), max(y1 - y0, 1.0)
+    x0, x1 = max(float(bx0), x0 - pad * w), min(float(bx1), x1 + pad * w)
+    y0, y1 = max(float(by0), y0 - pad * h), min(float(by1), y1 + pad * h)
     return (int(np.floor(x0)), int(np.floor(y0)), int(np.ceil(x1)), int(np.ceil(y1)))
 
 
@@ -333,9 +408,7 @@ def main():
     print(f"onnxruntime {ort.__version__}, providers available: {ort.get_available_providers()}")
     det_p = find_model("detector", DET_BYTES,
                        model_candidates("anime_person_detection", DET_NAME, "model.onnx"))
-    feat_p = find_model("ccip feat", CCIP_FEAT_BYTES,
-                        model_candidates("ccip_onnx", "ccip-caformer_b36-24", "model_feat.onnx")
-                        + model_candidates("ccip-caformer_b36-24", "model_feat.onnx"))
+    feat_p = find_model("ccip feat", CCIP_FEAT_BYTES, ccip_candidates(sys.argv))
     met_p = find_model("ccip metrics", CCIP_METRICS_BYTES,
                        [feat_p.parent / "model_metrics.onnx"])
 
@@ -398,16 +471,23 @@ def main():
 
     # ---- embeddings -----------------------------------------------------
     print("\n## Embedding\n")
-    imgs, full_idx, crop_idx = [], [], []
-    for img, d in zip(frames, dets):
+    imgs, full_idx, cont_idx, crop_idx = [], [], [], []
+    boxes = [content_box(img) for img in frames]
+    lb = sum(1 for bx, img in zip(boxes, frames) if bx != (0, 0) + img.size)
+    print(f"letterboxed/pillarboxed frames: {lb}/{len(frames)}; most common content box: "
+          f"{Counter(boxes).most_common(1)[0][0]}")
+    for img, d, bx in zip(frames, dets, boxes):
         full_idx.append(len(imgs))
         imgs.append(img)
+        cont_idx.append(len(imgs))
+        imgs.append(img.crop(bx))
         ci = []
         for b in d[:MAX_CROPS]:
             ci.append(len(imgs))
-            imgs.append(img.crop(pad_box(b, *img.size)))
+            imgs.append(img.crop(pad_box(b, *img.size, bounds=bx)))
         crop_idx.append(ci)
-    print(f"embedding {len(imgs)} images ({len(clips)} full + {len(imgs) - len(clips)} crops)")
+    print(f"embedding {len(imgs)} images ({len(clips)} full + {len(clips)} content + "
+          f"{len(imgs) - 2 * len(clips)} crops)")
     E = embed(feat, imgs)
     print(f"embeddings {E.shape}  ({time.time() - t0:.0f}s)")
     D = met.run(None, {met.get_inputs()[0].name: E})[0].astype(np.float32)
@@ -417,6 +497,7 @@ def main():
 
     variants = {
         "full": [[f] for f in full_idx],
+        "content": [[c] for c in cont_idx],
         "crop1": [c[:1] if c else [f] for f, c in zip(full_idx, crop_idx)],
         "cropN": [c if c else [f] for f, c in zip(full_idx, crop_idx)],
         "cropN+full": [[f] + c for f, c in zip(full_idx, crop_idx)],
@@ -453,8 +534,8 @@ def main():
     print(f"\n## Per character: full vs {best} (best crop variant), sorted by |change|\n")
     print("**Read this table, not the headline.** An aggregate in this project has "
           "already hidden a +90 and a -11 in the same run.\n")
-    print("| character | n | zero-det % | full | crop1 | cropN | cropN+full | change |")
-    print("|---|---:|---:|---:|---:|---:|---:|---:|")
+    print("| character | n | zero-det % | full | content | crop1 | cropN | cropN+full | change |")
+    print("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
     rows = []
     for ch in chars:
         m = labels == ch
@@ -462,7 +543,7 @@ def main():
         rows.append((pc[best] - pc["full"], ch, int(m.sum()), 100 * zero[m].mean(), pc))
     rows.sort(key=lambda r: (-abs(r[0]), r[1]))
     for delta, ch, n, zr, pc in rows:
-        print(f"| {ch} | {n} | {zr:.0f} | {pc['full']:.0f} | {pc['crop1']:.0f} | "
+        print(f"| {ch} | {n} | {zr:.0f} | {pc['full']:.0f} | {pc['content']:.0f} | {pc['crop1']:.0f} | "
               f"{pc['cropN']:.0f} | {pc['cropN+full']:.0f} | {delta:+.0f} |")
 
     flips_up = int((~res["full"][0] & res[best][0]).sum())

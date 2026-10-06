@@ -79,13 +79,16 @@ def main():
         kept = [b for b in allb if b[4] > P.CONF_THRESHOLD]
         low = [b for b in allb if b[4] <= P.CONF_THRESHOLD]
         zero += not kept
+        cb = P.content_box(img)
         dr = ImageDraw.Draw(img)
+        if cb != (0, 0) + img.size:
+            dr.rectangle((cb[0], cb[1], cb[2] - 1, cb[3] - 1), outline=(255, 255, 255), width=1)
         for b in low:
             dr.rectangle(b[:4], outline=(255, 220, 0), width=1)
         for b in kept:
             dr.rectangle(b[:4], outline=(0, 255, 0), width=2)
             dr.text((b[0] + 2, b[1] + 1), f"{b[4]:.2f}", fill=(0, 255, 0))
-            pb = P.pad_box(b, *img.size)
+            pb = P.pad_box(b, *img.size, bounds=cb)
             dr.rectangle(pb, outline=(0, 160, 255), width=1)
         dr.text((4, 4), f"{ch}  {cid}", fill=(255, 255, 255))
         img.save(out_dir / f"{cid}.jpg", quality=90)
@@ -96,8 +99,8 @@ def main():
               f"| {cid} | {ch} | 0 | {len(low)} | - | - |")
     n = len(sample)
     print(f"\nframes with ZERO kept detections: {zero}/{n} = {100 * zero / max(n, 1):.0f}%")
-    print("green = kept (score shown), blue = the padded crop the probe embeds, "
-          "yellow = below threshold.")
+    print("green = kept (score shown), blue = the padded crop the probe embeds (clipped "
+          "to the picture), white = detected letterbox edge, yellow = below threshold.")
     if thumbs:
         rows = (len(thumbs) + COLS - 1) // COLS
         sheet = Image.new("RGB", (COLS * THUMB, rows * THUMB), (20, 20, 20))

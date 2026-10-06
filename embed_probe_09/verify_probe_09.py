@@ -120,6 +120,86 @@ def test_pad():
           "(85,70,215,330) at PAD_FRAC 0.15")
 
 
+
+
+def _noise(h, w, rng):
+    return rng.integers(0, 255, (h, w, 3)).astype(np.uint8)
+
+
+def test_letterbox():
+    rng = np.random.default_rng(8)
+    W = H = 448
+    cases = []
+    # 16:9 picture padded to square, white bars (what the real frames show)
+    a = np.full((H, W, 3), 255, np.uint8); a[98:350] = _noise(252, W, rng)
+    cases.append(("white letterbox 98/98", a, (0, 98, 448, 350)))
+    a = np.zeros((H, W, 3), np.uint8); a[98:350] = _noise(252, W, rng)
+    cases.append(("black letterbox", a, (0, 98, 448, 350)))
+    a = np.zeros((H, W, 3), np.uint8); a[:, 98:350] = _noise(H, 252, rng)
+    cases.append(("pillarbox", a, (98, 0, 350, 448)))
+    cases.append(("no bars", _noise(H, W, rng), (0, 0, 448, 448)))
+    # white-background character art: blank top, figure touches the bottom
+    a = np.full((H, W, 3), 255, np.uint8); a[14:] = _noise(H - 14, W, rng)
+    cases.append(("white bg, one-sided -> NOT cropped", a, (0, 0, 448, 448)))
+    # bars that differ by more than BAR_SYM -> not a letterbox
+    a = np.full((H, W, 3), 255, np.uint8); a[40:400] = _noise(360, W, rng)
+    cases.append(("asymmetric 40/48 -> NOT cropped", a, (0, 0, 448, 448)))
+    # JPEG round trip: bars are not perfectly flat after compression
+    a = np.full((H, W, 3), 255, np.uint8); a[98:350] = _noise(252, W, rng)
+    import io
+    buf = io.BytesIO(); Image.fromarray(a).save(buf, "JPEG", quality=85)
+    jim = Image.open(io.BytesIO(buf.getvalue())).convert("RGB")
+    jgot = got = probe.content_box(jim)
+    assert abs(got[1] - 98) <= 2 and abs(got[3] - 350) <= 2 and got[0] == 0 and got[2] == 448, got
+    for name, arr, want in cases:
+        got = probe.content_box(Image.fromarray(arr))
+        assert got == want, (name, got, want)
+    # the real report's full-content box, padded inside the picture
+    b = probe.pad_box((0, 98, 443, 349, 0.6), 448, 448, bounds=(0, 98, 448, 350))
+    assert b == (0, 98, 448, 350), b
+    b = probe.pad_box((138, 159, 257, 331, 0.8), 448, 448, bounds=(0, 98, 448, 350))
+    assert 98 <= b[1] and b[3] <= 350, b
+    print(f"6. content_box right on {len(cases)} synthetic frames + a JPEG round trip "
+          f"(JPEG bars found at {jgot}); padded crops stay inside the picture")
+
+
+def test_ccip_search(work):
+    import os
+    hub = Path(work) / "hfhome" / "hub" / "models--deepghs--ccip_onnx" / "snapshots" / "abc123" / "ccip-caformer_b36-24"
+    hub.mkdir(parents=True, exist_ok=True)
+    (hub / "model_feat.onnx").write_bytes(b"x" * 10)
+    wrong = Path(work) / "_index" / "tools" / "stuff" / "ccip-caformer_b36-24"
+    wrong.mkdir(parents=True, exist_ok=True)
+    (wrong / "model_feat.onnx").write_bytes(b"x" * 9)
+    old = os.environ.get("HF_HOME"); os.environ["HF_HOME"] = str(Path(work) / "hfhome")
+    probe.INDEX = Path(work) / "_index"
+    try:
+        c = probe.ccip_candidates(["x"])
+        real = sys.stdout
+        import io
+        sys.stdout = io.StringIO()
+        try:
+            got = probe.find_model("ccip feat", 10, c)
+            out = sys.stdout.getvalue()
+        finally:
+            sys.stdout = real
+        assert got == hub / "model_feat.onnx", got
+        assert "WRONG SIZE" not in out  # right-size file found first is returned
+        c2 = probe.ccip_candidates(["x", str(wrong)])
+        assert c2[0] == wrong / "model_feat.onnx"
+        sys.stdout = io.StringIO()
+        try:
+            got2 = probe.find_model("ccip feat", 10, c2)
+            out2 = sys.stdout.getvalue()
+        finally:
+            sys.stdout = real
+        assert got2 == hub / "model_feat.onnx" and "WRONG SIZE" in out2
+    finally:
+        if old is None: os.environ.pop("HF_HOME", None)
+        else: os.environ["HF_HOME"] = old
+    print("7. CCIP found in the HF cache snapshot layout; a wrong-size file is reported and skipped")
+
+
 # ---- synthetic models ---------------------------------------------------
 def make_det(path):
     """Constant YOLOv8-shaped output: two person boxes, plus 0*mean(input)
@@ -244,6 +324,8 @@ if __name__ == "__main__":
     test_group_min()
     test_p_at_1()
     test_pad()
+    test_letterbox()
+    test_ccip_search(sys.argv[2])
     rep = test_end_to_end(sys.argv[2])
     Path(sys.argv[2], "synthetic_report.md").write_text(rep)
     print("ALL CHECKS PASSED")
