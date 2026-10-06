@@ -1,0 +1,17 @@
+scores
+  ok  nearest class by min distance
+  ok  abs = distance to nearest ref
+  ok  knn = mean of the k nearest refs of the matched class
+  ok  ratio = d1 / nearest other-class distance (midpoint query -> 1.0)
+  ok  knn with k=1 equals abs
+calibrate / classify
+  ok  midpoint and far queries rejected, in-class queries accepted (target_accept=1.0)
+  ok  score > 1 exactly when rejected
+  ok  every method and combination runs
+  ok  refuses to classify without calibration
+  ok  LOO accept rate on the references matches target_accept (incl. combinations)
+timing at the real size
+  calibrate 2,200 refs: 0.07s   classify 9,000 x 2,200: 0.28s
+  ok  runs at 9,000 x 2,200
+
+ALL 11 CHECKS PASSED
