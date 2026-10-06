@@ -7,7 +7,7 @@
 <style>
 :root{
   --bg:#101115; --panel:#181a20; --panel2:#1f222a; --line:#2c303a;
-  --text:#ebeef5; --muted:#8b91a1; --accent:#f5e500; --green:#78e696; --red:#ff6b6b;
+  --text:#ebeef5; --muted:#8b91a1; --accent:#f5e500; --green:#78e696; --red:#ff5a5a; --blue:#7fb2ff;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
@@ -19,41 +19,52 @@ button{font:inherit;color:var(--bg);background:var(--accent);border:0;border-rad
   padding:6px 12px;font-weight:600;cursor:pointer}
 button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
 button:focus-visible{outline:2px solid var(--text);outline-offset:2px}
-#app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
-header{display:flex;gap:18px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line)}
-header h1{font-size:15px;margin:0;color:var(--accent);letter-spacing:.04em}
-#where{font:600 15px Consolas,monospace}
-#prog{flex:1;display:flex;align-items:center;gap:10px;min-width:200px}
-#bar{flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden}
-#bar>div{height:100%;background:var(--green);width:0}
-#counts{color:var(--muted);white-space:nowrap}
-#unsaved{white-space:nowrap}
+#app{display:grid;grid-template-rows:auto auto 1fr auto;height:100vh}
+header{display:flex;gap:16px;align-items:center;padding:7px 16px;border-bottom:1px solid var(--line)}
+header h1{font-size:14px;margin:0;color:var(--accent);letter-spacing:.04em;white-space:nowrap}
+#prog{flex:1;display:flex;align-items:center;gap:10px;min-width:160px}
+#bar{flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;display:flex}
+#bar>div{height:100%;width:0}
+#counts{white-space:nowrap;font-size:13px}
+#counts b{font-weight:700}
+.c-named{color:var(--green)} .c-unk{color:var(--accent)} .c-none{color:var(--blue)} .c-open{color:var(--muted)}
+#unsaved{white-space:nowrap;font-size:13px;color:var(--muted)}
 #unsaved.warn{color:var(--accent)}
-main{display:flex;flex-direction:column;gap:12px;padding:12px 16px;min-height:0}
+#where{display:flex;gap:18px;align-items:baseline;padding:6px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+#wchar{font-size:22px;font-weight:800;letter-spacing:.02em}
+#wpos{font:600 14px Consolas,monospace}
+#wrest{color:var(--muted)}
+#wmode{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
+#wmode b{color:var(--text)}
+main{display:flex;flex-direction:column;gap:10px;padding:10px 16px;min-height:0}
+#single{display:flex;flex-direction:column;gap:10px;min-height:0;flex:1}
 #frames{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:0 1 auto;min-height:0}
 .fr{position:relative;background:#000;border:1px solid var(--line);border-radius:4px;
   display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0;
-  aspect-ratio:1;max-height:calc(100vh - 340px)}
+  aspect-ratio:1;max-height:calc(100vh - 380px)}
 .fr img{max-width:100%;max-height:100%;object-fit:contain;display:block}
-.fr .lab{position:absolute;left:6px;top:4px;color:var(--muted);font:600 12px Consolas,monospace;
-  text-shadow:0 0 3px #000}
+.fr .lab{position:absolute;left:6px;top:4px;color:var(--muted);font:600 12px Consolas,monospace;text-shadow:0 0 3px #000}
 .miss{color:var(--red);font:12px Consolas,monospace;padding:8px;word-break:break-all}
-#decide{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.4fr);gap:12px;flex:1 1 0;min-height:200px}
+#decide{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.4fr);gap:10px;flex:1 1 0;min-height:190px}
 #decide>.card{min-height:0;overflow:hidden}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
 .card h2{margin:0 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+h2 .ev{text-transform:none;letter-spacing:0;color:var(--accent);font-weight:400}
+#decide .card:first-child h2{white-space:nowrap;overflow:hidden}
 #prop{font-size:26px;font-weight:700;letter-spacing:.02em}
 #prop.none{color:var(--muted);font-size:18px}
 #prop.rejected{color:var(--muted);text-decoration:line-through}
 #meta{color:var(--muted);font:12px Consolas,monospace;margin-top:4px}
 #status{margin-top:8px;font-weight:700;font-size:16px;min-height:1.4em}
-#status.named{color:var(--green)} #status.unknown{color:var(--accent)} #status.open{color:var(--muted)}
+#status.named{color:var(--green)} #status.unknown{color:var(--accent)} #status.none{color:var(--blue)} #status.open{color:var(--muted)}
+#queue{color:var(--red);font-weight:600;margin-top:4px}
 #filterbox{font:600 18px Consolas,monospace;padding:6px 8px;border:1px solid var(--line);
   border-radius:4px;background:var(--bg);min-height:36px}
 #filterbox.active{border-color:var(--accent)}
 #filterbox .ph{color:var(--muted);font-weight:400;font-size:14px}
 #filterbox .caret{display:inline-block;width:9px;height:1.05em;background:var(--accent);
   vertical-align:text-bottom;animation:blink 1s steps(1) infinite}
+#filterbox:not(.active) .caret{display:none}
 @keyframes blink{50%{opacity:0}}
 #cands{list-style:none;margin:6px 0 0;padding:0;max-height:calc(100% - 70px);overflow:auto}
 #cands li{padding:3px 8px;border-radius:3px;font-weight:600}
@@ -63,20 +74,51 @@ main{display:flex;flex-direction:column;gap:12px;padding:12px 16px;min-height:0}
 #refs{display:flex;flex-direction:column;min-height:0}
 #refname{font-size:18px;font-weight:700;color:var(--green);margin-bottom:6px}
 #refgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;overflow:auto;min-height:0}
-#refgrid img{width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--line);border-radius:3px;background:#000}
+#refgrid img,#grefs img{width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--line);border-radius:3px;background:#000}
 #refnone{color:var(--muted)}
-footer{border-top:1px solid var(--line);padding:6px 16px;display:flex;flex-wrap:wrap;gap:4px 18px;color:var(--muted);font-size:13px}
+/* ---- grid mode ---- */
+#gridview{display:none;flex-direction:column;gap:8px;min-height:0;flex:1}
+#gridview.on{display:flex}
+#gtop{display:grid;grid-template-columns:220px minmax(0,1fr);gap:12px;align-items:center}
+#gtitle{font-size:13px;color:var(--muted)}
+#gtitle b{display:block;font-size:24px;color:var(--green);letter-spacing:.02em}
+#grefs{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;max-height:118px}
+#grefs img{height:110px;width:auto;max-width:100%}
+#ggrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:8px;flex:1;min-height:0}
+.gc{position:relative;background:var(--panel);border:2px solid var(--line);border-radius:6px;padding:4px;
+  display:flex;flex-direction:column;min-height:0;cursor:pointer;user-select:none}
+.gc .gh{display:flex;gap:8px;align-items:center;font:600 12px Consolas,monospace;color:var(--muted);padding:0 2px 3px}
+.gc .gh kbd{font-size:13px}
+.gc .gf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;flex:1;min-height:0}
+.gc .gf div{background:#000;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden;border-radius:2px}
+.gc .gf img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.gc.wrong{border:4px solid var(--red);background:#3a1416}
+.gc.wrong .gf{filter:grayscale(1) brightness(.35)}
+.gc.wrong::after{content:"\2715  WRONG";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#fff;font:900 34px/1 "Segoe UI",sans-serif;letter-spacing:.06em;pointer-events:none;
+  background:repeating-linear-gradient(45deg,rgba(255,90,90,.28) 0 14px,rgba(255,90,90,0) 14px 28px);
+  text-shadow:0 0 8px #000,0 0 2px #000}
+.gc.empty{visibility:hidden}
+#gfoot{color:var(--muted);font-size:13px}
+#gfoot b{color:var(--text)}
+footer{border-top:1px solid var(--line);padding:6px 16px;display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--muted);font-size:13px}
 footer span{white-space:nowrap}
 #flash{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);font-size:40px;font-weight:800;
-  padding:10px 28px;border-radius:8px;background:rgba(16,17,21,.88);pointer-events:none;opacity:0;transition:opacity .25s}
+  padding:10px 28px;border-radius:8px;background:rgba(16,17,21,.9);pointer-events:none;opacity:0;transition:opacity .25s;z-index:5}
 #flash.on{opacity:1;transition:none}
-#overlay{position:fixed;inset:0;background:rgba(8,9,12,.9);display:none;padding:28px;overflow:auto}
+/* ---- export overlay ---- */
+#overlay{position:fixed;inset:0;background:rgba(8,9,12,.92);display:none;padding:24px;overflow:auto;z-index:4}
 #overlay.on{display:block}
-#ex{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px}
-#ex textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:4px;
+#ex{max-width:1100px;margin:0 auto}
+#tabs{display:flex;gap:6px;margin-bottom:10px}
+#tabs button{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+#tabs button.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.pane{display:none}
+.pane.on{display:block}
+#overlay textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:4px;
   font:13px/1.45 Consolas,monospace;padding:8px;resize:vertical}
-#ex textarea:focus{outline:1px solid var(--accent)}
-#exsum{color:var(--muted);margin:6px 0 10px;white-space:pre-line}
+#overlay textarea:focus{outline:1px solid var(--accent)}
+.sum{color:var(--muted);margin:6px 0 10px;white-space:pre-line}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 #impmsg{white-space:pre-line;margin-top:8px;font:12px Consolas,monospace}
 #loader{max-width:640px;margin:12vh auto;padding:24px;display:none}
@@ -97,23 +139,29 @@ footer span{white-space:nowrap}
 <div id="app" hidden>
   <header>
     <h1>CHARPASS REVIEW</h1>
-    <div id="where"></div>
-    <div id="prog"><div id="bar"><div></div></div><span id="counts"></span></div>
+    <div id="prog"><div id="bar"><div class="b-named" style="background:var(--green)"></div><div style="background:var(--accent)"></div><div style="background:var(--blue)"></div></div></div>
+    <span id="counts"></span>
     <span id="unsaved"></span>
-    <span id="dwarn" style="color:var(--accent);white-space:nowrap"></span>
+    <span id="dwarn" style="color:var(--accent);white-space:nowrap;font-size:13px"></span>
   </header>
+  <div id="where">
+    <span id="wchar"></span><span id="wpos"></span><span id="wrest"></span>
+    <span id="wmode"></span>
+  </div>
   <main>
+    <div id="single">
       <div id="frames"></div>
       <div id="decide">
         <div class="card">
-          <h2>Proposed</h2>
+          <h2>Machine guess <span class="ev">— evidence, not a verdict; unmeasured here</span></h2>
           <div id="prop"></div>
           <div id="meta"></div>
           <div id="status"></div>
+          <div id="queue"></div>
           <div id="warnings"></div>
         </div>
         <div class="card">
-          <h2>Name — type to filter</h2>
+          <h2>Name — <kbd>/</kbd> to filter</h2>
           <div id="filterbox"></div>
           <ul id="cands"></ul>
         </div>
@@ -124,32 +172,50 @@ footer span{white-space:nowrap}
           <div id="refnone"></div>
         </div>
       </div>
+    </div>
+    <div id="gridview">
+      <div id="gtop">
+        <div id="gtitle"></div>
+        <div id="grefs"></div>
+      </div>
+      <div id="ggrid"></div>
+      <div id="gfoot"></div>
+    </div>
   </main>
   <footer id="keys"></footer>
 </div>
 
 <div id="overlay">
   <div id="ex">
-    <div class="card">
-      <h2>Rulings — cells.txt lines</h2>
-      <div id="exsum"></div>
-      <textarea id="extext" rows="22" readonly></textarea>
-      <div class="row">
-        <button id="dl">Download .txt</button>
-        <button id="cp" class="ghost">Copy</button>
-        <span style="color:var(--muted)"><kbd>D</kbd> download · <kbd>C</kbd> copy · <kbd>Esc</kbd> close</span>
-      </div>
+    <div id="tabs">
+      <button data-tab="0">1 · Rulings (cells.txt)</button>
+      <button data-tab="1">2 · No-character ids</button>
+      <button data-tab="2">3 · Restore / import</button>
+      <span style="color:var(--muted);align-self:center;margin-left:8px">
+        <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> panel · <kbd>D</kbd> download · <kbd>C</kbd> copy · <kbd>Esc</kbd> close</span>
     </div>
-    <div class="card">
+    <div class="pane card" id="pane0">
+      <h2>Rulings — cells.txt lines (names and unknown)</h2>
+      <div class="sum" id="exsum"></div>
+      <textarea id="extext" rows="22" readonly></textarea>
+      <div class="row"><button id="dl">Download rulings .txt</button><button id="cp" class="ghost">Copy</button></div>
+    </div>
+    <div class="pane card" id="pane1">
+      <h2>No character — clip ids, one per line</h2>
+      <div class="sum" id="nonesum"></div>
+      <textarea id="nonetext" rows="22" readonly></textarea>
+      <div class="row"><button id="dlnone">Download ids .txt</button><button id="cpnone" class="ghost">Copy</button></div>
+    </div>
+    <div class="pane card" id="pane2">
       <h2>Restore / import</h2>
-      <p style="color:var(--muted);margin:0 0 6px">The downloaded file IS the backup. If this browser's storage
-      was cleared, paste it here (or load it) and apply: every
-      <code>SHEET/cells = NAME</code> line is ruled again on the matching cells.</p>
-      <textarea id="imptext" rows="10" placeholder="N047/01-04,07 = SHARK"></textarea>
+      <p style="color:var(--muted);margin:0 0 6px">The two downloads ARE the backup. If this browser's storage was
+      cleared, paste either or both here and apply: <code>SHEET/cells = NAME</code> lines are ruled again on
+      the matching cells, and bare clip-id lines are ruled "no character".</p>
+      <textarea id="imptext" rows="12" placeholder="N047/01-04,07 = SHARK&#10;a1b2c3d4e5f6"></textarea>
       <div class="row">
         <button id="impgo">Apply import</button>
         <button id="impfilebtn" class="ghost">Load .txt…</button>
-        <input type="file" id="impfile" accept=".txt,text/plain" hidden>
+        <input type="file" id="impfile" accept=".txt,text/plain" multiple hidden>
       </div>
       <div id="impmsg"></div>
       <div class="row" id="orphanrow" style="display:none">
@@ -243,39 +309,77 @@ function parseLines(text) {
   });
   return { ok: ok, errors: errors };
 }
+/** Separate bare clip-id lines (the no-character export) from cells.txt
+ *  lines. An id line is 8-32 hex chars and nothing else ('#' comments ok). */
+function splitIdLines(text) {
+  const ids = [], rest = [];
+  text.split(/\r?\n/).forEach(function (line) {
+    const t = line.replace(/#.*$/, "").trim();
+    if (/^[0-9a-f]{8,32}$/i.test(t)) ids.push(t.toLowerCase());
+    else rest.push(line);
+  });
+  return { ids: ids, rest: rest.join("\n") };
+}
+
+/** Grouped review order. rows: [{prop, distance}] (prop = roster name or
+ *  null). Groups sorted by name, the no-proposal group last; inside a group
+ *  distance ascending, missing distance last, ties by original position.
+ *  Returns {order:[indices], groups:[{name, idx:[indices]}]}. */
+function groupOrder(rows) {
+  const by = new Map();
+  rows.forEach(function (r, i) {
+    const k = r.prop == null ? null : r.prop;
+    if (!by.has(k)) by.set(k, []);
+    by.get(k).push(i);
+  });
+  const dist = function (i) { const d = rows[i].distance; return typeof d === "number" && isFinite(d) ? d : Infinity; };
+  const names = [...by.keys()].filter(function (k) { return k !== null; })
+    .sort(function (a, b) { return a.localeCompare(b, "en"); });
+  if (by.has(null)) names.push(null);
+  const groups = names.map(function (n) {
+    const idx = by.get(n).slice().sort(function (a, b) { return dist(a) - dist(b) || a - b; });
+    return { name: n, idx: idx };
+  });
+  return { order: [].concat.apply([], groups.map(function (g) { return g.idx; })), groups: groups };
+}
 // ===== END PURE =====
 
-const STORE_KEY = "charpassReview.v1";   // {rulings:{"N047/12":{v,id,t}}, pos, exported}
+const STORE_KEY = "charpassReview.v1";   // {rulings:{"N047/12":{v,id,t}}, pos, order, lastDl}
+const NONE = "#none";                    // stored value for "no character in this clip"
+const GRID_N = 12;
+const GRID_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="];
 const $ = function (id) { return document.getElementById(id); };
-let D = null;              // data
-let canon = new Map();     // UPPER name or alias -> roster name
-let idx = 0;               // current item
-let filter = "";           // typed filter
-let candSel = 0;
-let cands = [];
-let rejected = false;      // "2" pressed on this item
-let st = { rulings: {}, pos: null, exported: 0 };
-let storageOK = true;
-let orphanKeys = [];
+let D = null;
+let canon = new Map();       // UPPER name or alias -> roster name
+let ord = [];                // display order: item indices
+let cur = 0;                 // position in ord
+let groups = [];             // grouped mode: [{name, idx:[item indices in order]}]
+let groupOf = [];            // item index -> group number
+let filter = null;           // null = filter closed; string = open
+let candSel = 0, cands = [];
+let rejected = false;
+let queue = [];              // item indices sent from the grid to be named
+let gridResume = null;       // character to return to after the queue drains
+let grid = null;             // {name, items:[item idx], wrong:Set(item idx)}
+let st = { rulings: {}, pos: null, order: "grouped", lastDl: 0 };
+let storageOK = true, orphanKeys = [], loadWarnings = [];
+let tab = 0;
 
 function itemKey(it) { return it.sheet + "/" + it.cell; }
-
 function load() {
   try { const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-        if (s && s.rulings) st = s; }
+        if (s && s.rulings) st = Object.assign(st, s); }
   catch (e) { storageOK = false; }
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(st)); storageOK = true; }
   catch (e) { storageOK = false; }
 }
-
-/** Rulings that apply to the CURRENT data: key present AND id still matches
- *  (sheet codes are positional; a rebuilt sheet re-points cells). */
 function liveRuling(it) {
   const r = st.rulings[itemKey(it)];
   return r && r.id === it.id ? r : null;
 }
+function isOpen(i) { return !liveRuling(D.items[i]); }
 
 function validate(data) {
   const w = [];
@@ -295,40 +399,46 @@ function validate(data) {
     if (seen.has(k)) throw new Error("duplicate sheet/cell " + k + " (item " + i + ")");
     seen.add(k);
     it.frames = it.frames || [];
+    it._prop = null;
     if (it.proposed != null) {
       const c = canon.get(String(it.proposed).toUpperCase());
-      if (!c) { w.push(k + ": proposed '" + it.proposed + "' not in roster -- accept disabled"); it._prop = null; }
+      if (!c) w.push(k + ": proposed '" + it.proposed + "' not in roster -- accept disabled");
       else it._prop = c;
-    } else it._prop = null;
+    }
   });
   data.refs = data.refs || {};
   return w;
 }
 
-let loadWarnings = [];
+function buildOrder() {
+  const g = groupOrder(D.items.map(function (it) { return { prop: it._prop, distance: it.distance }; }));
+  groups = g.groups;
+  groupOf = new Array(D.items.length);
+  groups.forEach(function (gr, gi) { gr.idx.forEach(function (i) { groupOf[i] = gi; }); });
+  ord = st.order === "original" ? D.items.map(function (_, i) { return i; }) : g.order;
+}
+
 function start(data) {
   D = data;
   loadWarnings = validate(D);
   load();
-  const keys = new Set(D.items.map(itemKey));
+  if (st.order !== "original") st.order = "grouped";
+  buildOrder();
+  const keys = new Map(D.items.map(function (it) { return [itemKey(it), it]; }));
   orphanKeys = Object.keys(st.rulings).filter(function (k) {
-    if (!keys.has(k)) return true;
-    const it = D.items.find(function (x) { return itemKey(x) === k; });
-    return st.rulings[k].id !== it.id;
+    const it = keys.get(k); return !it || st.rulings[k].id !== it.id;
   });
-  const p = st.pos ? D.items.findIndex(function (x) { return itemKey(x) === st.pos; }) : -1;
-  idx = p >= 0 ? p : nextUnruled(-1);
-  if (idx < 0) idx = 0;
+  const p = st.pos ? ord.findIndex(function (i) { return itemKey(D.items[i]) === st.pos; }) : -1;
+  cur = p >= 0 ? p : Math.max(0, nextOpen(-1));
   $("loader").classList.remove("on");
   $("app").hidden = false;
-  renderKeys();
   render();
 }
 
 // ---------- rendering ----------
 function imgEl(src, alt) {
   const im = new Image();
-  im.alt = alt; im.src = src; im.decoding = "async";
+  im.alt = alt; im.src = src; im.decoding = "async"; im.loading = "eager";
   im.onerror = function () {
     const d = document.createElement("div");
     d.className = "miss"; d.textContent = "missing: " + src;
@@ -338,67 +448,114 @@ function imgEl(src, alt) {
 }
 
 function counts() {
-  let named = 0, unk = 0;
+  const c = { named: 0, unknown: 0, none: 0, open: 0, total: D.items.length };
   D.items.forEach(function (it) {
     const r = liveRuling(it);
-    if (r) { if (r.v === "unknown") unk++; else named++; }
+    if (!r) c.open++;
+    else if (r.v === "unknown") c.unknown++;
+    else if (r.v === NONE) c.none++;
+    else c.named++;
   });
-  return { named: named, unknown: unk, done: named + unk, total: D.items.length };
+  return c;
+}
+
+function renderHeader() {
+  const c = counts();
+  $("counts").innerHTML = "<b class=c-named>" + c.named + "</b> named · <b class=c-unk>" + c.unknown
+    + "</b> unknown · <b class=c-none>" + c.none + "</b> no character · <b class=c-open>" + c.open + "</b> unruled";
+  const bars = $("bar").children, T = Math.max(1, c.total);
+  bars[0].style.width = (100 * c.named / T) + "%";
+  bars[1].style.width = (100 * c.unknown / T) + "%";
+  bars[2].style.width = (100 * c.none / T) + "%";
+  let pending = 0;
+  Object.values(st.rulings).forEach(function (r) { if (r.t > (st.lastDl || 0)) pending++; });
+  $("unsaved").textContent = storageOK ? (pending ? pending + " changed since last download" : "all downloaded")
+    : "⚠ browser storage unavailable — download often";
+  $("unsaved").className = (pending >= 50 || !storageOK) ? "warn" : "";
+  $("dwarn").textContent = loadWarnings.length ? "⚠ " + loadWarnings.length + " data warning(s) — see export" : "";
+
+  const i = grid ? grid.items[0] : ord[cur];
+  const it = D.items[i];
+  if (st.order === "grouped") {
+    const gi = groupOf[i], g = groups[gi];
+    const pos = g.idx.indexOf(i) + 1;
+    const left = g.idx.filter(isOpen).length;
+    let after = 0, noProp = 0;
+    for (let k = gi + 1; k < groups.length; k++) {
+      if (!groups[k].name) noProp = groups[k].idx.filter(isOpen).length;
+      else if (groups[k].idx.some(isOpen)) after++;
+    }
+    $("wchar").textContent = g.name || "(no usable proposal)";
+    $("wchar").style.color = g.name ? "var(--green)" : "var(--muted)";
+    let gp = "";
+    if (grid) {
+      const open = g.idx.filter(isOpen);
+      gp = "grid page " + (Math.floor(open.indexOf(grid.items[0]) / GRID_N) + 1) + " of " + Math.ceil(open.length / GRID_N);
+    }
+    $("wpos").textContent = grid ? gp : pos + " / " + g.idx.length;
+    $("wrest").textContent = left + " unruled left in " + (g.name || "this group") + " · "
+      + after + " more character" + (after === 1 ? "" : "s") + " after this"
+      + (noProp ? " (+" + noProp + " without a usable proposal)" : "");
+  } else {
+    $("wchar").textContent = itemKey(it);
+    $("wchar").style.color = "var(--text)";
+    $("wpos").textContent = (cur + 1) + " / " + ord.length;
+    $("wrest").textContent = "original order";
+  }
+  $("wmode").innerHTML = "order <b>" + st.order + "</b> (<kbd>O</kbd>) · mode <b>" + (grid ? "grid" : "one at a time")
+    + "</b> (<kbd>G</kbd>)";
 }
 
 function render() {
-  const it = D.items[idx];
-  const c = counts();
-  $("where").textContent = itemKey(it) + "  ·  " + (idx + 1) + " / " + c.total;
-  $("bar").firstElementChild.style.width = (100 * c.done / Math.max(1, c.total)) + "%";
-  $("counts").textContent = c.done + " ruled (" + c.named + " named, " + c.unknown + " unknown) · "
-    + (c.total - c.done) + " open";
-  const pending = Math.max(0, c.done - (st.exported || 0));
-  $("unsaved").textContent = storageOK
-    ? (pending ? pending + " not yet downloaded" : "all downloaded")
-    : "⚠ browser storage unavailable — download often";
-  $("unsaved").className = (pending >= 50 || !storageOK) ? "warn" : "";
-
+  renderHeader();
+  renderKeys();
+  $("single").style.display = grid ? "none" : "";
+  $("gridview").classList.toggle("on", !!grid);
+  if (grid) { renderGrid(); return; }
+  const it = D.items[ord[cur]];
   const fr = $("frames"); fr.textContent = "";
-  ["25%", "50%", "75%"].forEach(function (lab, i) {
+  ["25%", "50%", "75%"].forEach(function (lab, k) {
     const box = document.createElement("div"); box.className = "fr";
-    if (it.frames[i]) box.appendChild(imgEl(it.frames[i], lab));
+    if (it.frames[k]) box.appendChild(imgEl(it.frames[k], lab));
     else { const m = document.createElement("div"); m.className = "miss"; m.textContent = "no frame"; box.appendChild(m); }
-    const l = document.createElement("div"); l.className = "lab"; l.textContent = lab; box.appendChild(l);
+    const l = document.createElement("div"); l.className = "lab"; l.textContent = lab + "  " + itemKey(it); box.appendChild(l);
     fr.appendChild(box);
   });
-
   const prop = $("prop");
   prop.className = it._prop ? (rejected ? "rejected" : "") : "none";
   prop.textContent = it._prop || (it.proposed ? it.proposed + " (not in roster)" : "no proposal");
-  const meta = ["id " + it.id];
-  if (typeof it.distance === "number") meta.push("dist " + it.distance.toFixed(3));
-  if (it.agreement != null) meta.push("agreement " + it.agreement);
-  $("meta").textContent = meta.join("  ·  ");
-
+  $("meta").textContent = evidence(it) + "  ·  id " + it.id;
   const r = liveRuling(it), s = $("status");
   if (!r) { s.className = "open"; s.textContent = "not yet ruled"; }
   else if (r.v === "unknown") { s.className = "unknown"; s.textContent = "RULED: unknown"; }
+  else if (r.v === NONE) { s.className = "none"; s.textContent = "RULED: no character"; }
   else { s.className = "named"; s.textContent = "RULED: " + r.v; }
+  $("queue").textContent = queue.total
+    ? "from grid: marked wrong — name it (" + (queue.total - queue.length) + " of " + queue.total + ")" : "";
   $("warnings").textContent = loadWarnings.filter(function (w) { return w.startsWith(itemKey(it) + ":"); }).join("\n");
-  $("dwarn").textContent = loadWarnings.length ? "⚠ " + loadWarnings.length + " data warning(s) — see export panel" : "";
-
   renderFilter();
-  preload(idx + 1);
+  preload(ord[cur + 1]);
+}
+
+function evidence(it) {
+  const e = [];
+  if (typeof it.distance === "number") e.push("dist " + it.distance.toFixed(3));
+  if (it.agreement != null) e.push(it.agreement + "/3 frames agree");
+  return e.length ? e.join(" · ") : "no evidence";
 }
 
 function renderFilter() {
   const fb = $("filterbox");
-  fb.classList.toggle("active", !!filter || rejected);
+  fb.classList.toggle("active", filter !== null);
   fb.innerHTML = "";
-  if (filter) { fb.appendChild(document.createTextNode(filter)); }
+  if (filter) fb.appendChild(document.createTextNode(filter));
   else {
     const ph = document.createElement("span"); ph.className = "ph";
-    ph.textContent = rejected ? "proposal rejected — type the right name  " : "start typing a name…  ";
+    ph.textContent = filter !== null ? (rejected ? "proposal rejected — type the right name  " : "type a name…  ")
+      : "press / to search the roster";
     fb.appendChild(ph);
   }
   const caret = document.createElement("span"); caret.className = "caret"; fb.appendChild(caret);
-
   cands = filter ? match(filter) : [];
   if (candSel >= cands.length) candSel = Math.max(0, cands.length - 1);
   const ul = $("cands"); ul.textContent = "";
@@ -430,11 +587,13 @@ function match(q) {
     const prev = best.get(name);
     if (!prev || sc < prev.sc || (sc === prev.sc && !via && prev.via)) best.set(name, { name: name, sc: sc, via: via });
   });
-  return [...best.values()].sort(function (a, b) { return a.sc - b.sc || a.name.localeCompare(b.name); });
+  return [...best.values()].sort(function (a, b) {
+    return a.sc - b.sc || (a.via ? 1 : 0) - (b.via ? 1 : 0) || a.name.localeCompare(b.name);
+  });
 }
 
 function renderRefs() {
-  const it = D.items[idx];
+  const it = D.items[ord[cur]];
   const name = cands.length ? cands[candSel].name : (rejected ? null : it._prop);
   $("refname").textContent = name || "—";
   const g = $("refgrid"); g.textContent = "";
@@ -449,11 +608,12 @@ function preload(i) {
 }
 
 function renderKeys() {
-  const K = [
-    ["Enter", "accept proposal"], ["1", "accept"], ["2", "reject → type name"], ["3", "unknown"],
-    ["a–z", "filter names"], ["↑ ↓", "pick name"], ["Enter", "assign picked"], ["Esc", "clear filter"],
-    ["←", "back"], ["→", "skip"], [".", "next unruled"], ["Del", "clear ruling"], ["=", "export / restore"]
-  ];
+  let K;
+  if (grid) K = [["1–9 0 - =", "toggle WRONG"], ["Enter", "accept all not marked wrong"], ["→ ←", "next / previous page (rules nothing)"],
+    ["Esc", "leave grid (rules nothing)"]];
+  else if (filter !== null) K = [["a–z", "type"], ["↑ ↓", "pick"], ["Enter", "assign"], ["Esc", "close search"]];
+  else K = [["Enter", "accept"], ["2", "reject → name"], ["3", "unknown"], ["N", "no character"], ["/", "search names"],
+    ["G", "grid of 12"], ["←", "back"], ["→", "skip"], [".", "next unruled"], ["Del", "clear"], ["O", "order"], ["=", "export"]];
   const f = $("keys"); f.textContent = "";
   K.forEach(function (k) {
     const s = document.createElement("span");
@@ -466,79 +626,214 @@ let flashT = 0;
 function flash(text, color) {
   const f = $("flash"); f.textContent = text; f.style.color = color;
   f.classList.add("on"); clearTimeout(flashT);
-  flashT = setTimeout(function () { f.classList.remove("on"); }, 350);
+  flashT = setTimeout(function () { f.classList.remove("on"); }, 380);
 }
 
-// ---------- actions ----------
-function rule(value) {
-  const it = D.items[idx];
+// ---------- single-item actions ----------
+function setRuling(i, value) {
+  const it = D.items[i];
   st.rulings[itemKey(it)] = { v: value, id: it.id, t: Date.now() };
-  flash(value, value === "unknown" ? "var(--accent)" : "var(--green)");
-  go(idx + 1);
 }
-function clearRuling() {
-  const it = D.items[idx];
-  if (st.rulings[itemKey(it)]) { delete st.rulings[itemKey(it)]; flash("cleared", "var(--muted)"); }
+function rule(value) {
+  setRuling(ord[cur], value);
+  flash(value === NONE ? "no character" : value, value === "unknown" ? "var(--accent)" : value === NONE ? "var(--blue)" : "var(--green)");
+  advance();
+}
+function advance() {
+  if (queue.length) { goItem(queue.shift(), true); return; }
+  if (queue.total) {
+    queue = []; const g = gridResume; gridResume = null;
+    if (g && enterGrid(g, null)) return;
+  }
+  go(cur + 1);
+}
+function go(p) {
+  cur = Math.max(0, Math.min(ord.length - 1, p));
+  filter = null; candSel = 0; rejected = false;
+  st.pos = itemKey(D.items[ord[cur]]);
   save(); render();
 }
-function go(i) {
-  idx = Math.max(0, Math.min(D.items.length - 1, i));
-  filter = ""; candSel = 0; rejected = false;
-  st.pos = itemKey(D.items[idx]);
-  save(); render();
+function goItem(i, rej) {
+  go(ord.indexOf(i));
+  if (rej) { rejected = true; filter = ""; render(); }
 }
-function nextUnruled(from) {
-  for (let k = 1; k <= D.items.length; k++) {
-    const i = (from + k) % D.items.length;
-    if (!liveRuling(D.items[i])) return i;
+function nextOpen(from) {
+  for (let k = 1; k <= ord.length; k++) {
+    const p = (from + k) % ord.length;
+    if (isOpen(ord[p])) return p;
   }
   return -1;
 }
+function clearRuling() {
+  const it = D.items[ord[cur]];
+  if (st.rulings[itemKey(it)]) { delete st.rulings[itemKey(it)]; flash("cleared", "var(--muted)"); }
+  save(); render();
+}
+function toggleOrder() {
+  const keep = ord[cur];
+  st.order = st.order === "grouped" ? "original" : "grouped";
+  buildOrder();
+  cur = ord.indexOf(keep);
+  save(); flash(st.order, "var(--text)"); render();
+}
 
-function currentRulings() {
-  const out = [];
-  D.items.forEach(function (it) {
-    const r = liveRuling(it);
-    if (r) out.push({ sheet: it.sheet, cell: it.cell, value: r.v });
-  });
-  return out;
+// ---------- grid mode ----------
+/** Open the grid on `name`, showing up to 12 OPEN items of that character
+ *  starting at item `fromItem` (or the group's first open item). */
+function enterGrid(name, fromItem) {
+  const g = groups.find(function (x) { return x.name === name; });
+  if (!g) return false;
+  let start = fromItem == null ? 0 : Math.max(0, g.idx.indexOf(fromItem));
+  const open = g.idx.slice(start).filter(isOpen).concat(g.idx.slice(0, start).filter(isOpen));
+  if (!open.length) return false;
+  grid = { name: name, items: open.slice(0, GRID_N), wrong: new Set() };
+  filter = null; rejected = false;
+  render();
+  return true;
+}
+function gridPage(dir) {
+  const g = groups.find(function (x) { return x.name === grid.name; });
+  const open = g.idx.filter(isOpen);
+  const first = open.indexOf(grid.items[0]);
+  let s = first + dir * GRID_N;
+  if (s >= open.length || s < 0) { flash(dir > 0 ? "last page" : "first page", "var(--muted)"); return; }
+  grid.items = open.slice(s, s + GRID_N); grid.wrong = new Set();
+  render();
+}
+function gridToggle(k) {
+  const i = grid.items[k]; if (i === undefined) return;
+  if (grid.wrong.has(i)) grid.wrong.delete(i); else grid.wrong.add(i);
+  renderGrid();
+}
+function gridAccept() {
+  const name = grid.name, wrong = grid.items.filter(function (i) { return grid.wrong.has(i); });
+  let n = 0;
+  grid.items.forEach(function (i) { if (!grid.wrong.has(i)) { setRuling(i, name); n++; } });
+  save();
+  const last = grid.items[grid.items.length - 1];
+  grid = null;
+  flash("✓ " + n + " × " + name + (wrong.length ? "  ·  " + wrong.length + " to name" : ""), "var(--green)");
+  if (wrong.length) {
+    queue = wrong.slice(); queue.total = wrong.length; gridResume = name;
+    goItem(queue.shift(), true);
+    return;
+  }
+  if (enterGrid(name, last)) return;
+  // character finished: move to the next character that still has open proposals
+  const gi = groups.findIndex(function (x) { return x.name === name; });
+  for (let k = gi + 1; k < groups.length; k++) {
+    if (groups[k].name && enterGrid(groups[k].name, null)) { flash("next: " + groups[k].name, "var(--green)"); return; }
+  }
+  const p = nextOpen(cur - 1); if (p >= 0) go(p); else render();
+  flash("no proposals left for the grid", "var(--muted)");
+}
+function leaveGrid() {
+  const first = grid.items[0]; grid = null;
+  go(ord.indexOf(first));
+  flash("grid closed — nothing ruled", "var(--muted)");
+}
+function renderGrid() {
+  const name = grid.name;
+  $("gtitle").innerHTML = "references pinned<b></b>";
+  $("gtitle").querySelector("b").textContent = name;
+  const gr = $("grefs"); gr.textContent = "";
+  (D.refs[name] || []).slice(0, 8).forEach(function (src) { gr.appendChild(imgEl(src, name)); });
+  if (!(D.refs[name] || []).length) gr.textContent = "no confirmed reference frames for " + name;
+  const gg = $("ggrid"); gg.textContent = "";
+  for (let k = 0; k < GRID_N; k++) {
+    const i = grid.items[k];
+    const c = document.createElement("div");
+    if (i === undefined) { c.className = "gc empty"; gg.appendChild(c); continue; }
+    const it = D.items[i];
+    c.className = "gc" + (grid.wrong.has(i) ? " wrong" : "");
+    c.onclick = function () { gridToggle(k); };
+    const h = document.createElement("div"); h.className = "gh";
+    const kb = document.createElement("kbd"); kb.textContent = GRID_KEYS[k];
+    h.appendChild(kb); h.appendChild(document.createTextNode(itemKey(it) + "  ·  " + evidence(it)));
+    c.appendChild(h);
+    const f = document.createElement("div"); f.className = "gf";
+    for (let j = 0; j < 3; j++) {
+      const d = document.createElement("div");
+      if (it.frames[j]) d.appendChild(imgEl(it.frames[j], "")); else d.textContent = "—";
+      f.appendChild(d);
+    }
+    c.appendChild(f);
+    gg.appendChild(c);
+  }
+  const nw = grid.wrong.size;
+  $("gfoot").innerHTML = "<b>Enter</b> rules <b>" + (grid.items.length - nw) + "</b> as " + "<b></b>"
+    + (nw ? " and sends <b style='color:var(--red)'>" + nw + "</b> marked wrong to be named one at a time" : "")
+    + ". Paging or <b>Esc</b> rules nothing. Machine guesses are evidence, not verdicts.";
+  $("gfoot").querySelectorAll("b")[2].textContent = name;
 }
 
 // ---------- export / import ----------
-function openExport() {
-  const rs = currentRulings();
-  const lines = buildLines(rs);
+function cellRulings() {
+  const out = [];
+  D.items.forEach(function (it) {
+    const r = liveRuling(it);
+    if (r && r.v !== NONE) out.push({ sheet: it.sheet, cell: it.cell, value: r.v });
+  });
+  return out;
+}
+function noneIds() {
+  const out = [];
+  D.items.forEach(function (it) { const r = liveRuling(it); if (r && r.v === NONE) out.push(it.id); });
+  return [...new Set(out)].sort();
+}
+function openExport(t) {
+  if (t !== undefined) tab = t;
+  const rs = cellRulings(), lines = buildLines(rs), c = counts();
   $("extext").value = lines.join("\n") + (lines.length ? "\n" : "");
-  const c = counts();
-  $("exsum").textContent = lines.length + " lines covering " + rs.length + " cells ("
-    + c.named + " named, " + c.unknown + " unknown). " + (c.total - c.done)
-    + " cells not ruled — they emit nothing.";
-  if (loadWarnings.length) $("exsum").textContent += "\n\nData warnings:\n" + loadWarnings.join("\n");
+  $("exsum").textContent = lines.length + " lines covering " + rs.length + " cells (" + c.named + " named, "
+    + c.unknown + " unknown). No-character clips are NOT here — panel 2. " + c.open + " unruled cells emit nothing."
+    + (loadWarnings.length ? "\n\nData warnings:\n" + loadWarnings.join("\n") : "");
+  const ids = noneIds();
+  $("nonetext").value = ids.join("\n") + (ids.length ? "\n" : "");
+  $("nonesum").textContent = ids.length + " clips ruled \"no character\" (backgrounds, UI, patterns). Plain ids, "
+    + "one per line, for the id-based tool. Not part of cells.txt.";
   $("orphanrow").style.display = orphanKeys.length ? "flex" : "none";
   $("orphanmsg").textContent = orphanKeys.length + " stored rulings don't match this data file "
     + "(cell gone or re-pointed to another clip) and are NOT exported.";
+  document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.toggle("on", +b.dataset.tab === tab); });
+  [0, 1, 2].forEach(function (k) { $("pane" + k).classList.toggle("on", k === tab); });
   $("overlay").classList.add("on");
-  $("dl").focus();
+  if (document.activeElement) document.activeElement.blur();
 }
-function closeExport() { $("overlay").classList.remove("on"); document.activeElement.blur(); render(); }
-function download() {
-  const txt = $("extext").value;
-  const d = new Date(), ts = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "-" + pad2(d.getHours()) + pad2(d.getMinutes());
+function closeExport() { $("overlay").classList.remove("on"); if (document.activeElement) document.activeElement.blur(); render(); }
+function stamp() {
+  const d = new Date();
+  return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + "-" + pad2(d.getHours()) + pad2(d.getMinutes());
+}
+function saveText(txt, name) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" }));
-  a.download = "review_rulings_" + ts + ".txt";
+  a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
-  st.exported = counts().done; save();
+  st.lastDl = Date.now(); save();
   flash("downloaded", "var(--green)");
 }
+function download() {
+  if (tab === 1) saveText($("nonetext").value, "no_character_ids_" + stamp() + ".txt");
+  else saveText($("extext").value, "review_rulings_" + stamp() + ".txt");
+}
+function copyOut() {
+  const t = tab === 1 ? $("nonetext") : $("extext");
+  t.select();
+  (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject())
+    .catch(function () { document.execCommand("copy"); });
+  flash("copied", "var(--green)");
+}
 function applyImport(text) {
-  const p = parseLines(text);
-  const byKey = new Map(D.items.map(function (it) { return [itemKey(it), it]; }));
-  let applied = 0, missing = 0;
+  const sp = splitIdLines(text);
+  const p = parseLines(sp.rest);
+  const byKey = new Map(D.items.map(function (it, i) { return [itemKey(it), i]; }));
+  const byId = new Map(D.items.map(function (it, i) { return [it.id, i]; }));
+  let applied = 0, missing = 0, noneApplied = 0, noneMissing = 0;
   const errs = p.errors.slice();
   p.ok.forEach(function (r) {
-    const it = byKey.get(r.sheet + "/" + r.cell);
-    if (!it) { missing++; return; }
+    const i = byKey.get(r.sheet + "/" + r.cell);
+    if (i === undefined) { missing++; return; }
     let v = r.value;
     if (v.toLowerCase() === "unknown") v = "unknown";
     else {
@@ -546,14 +841,19 @@ function applyImport(text) {
       if (!c) { errs.push(r.sheet + "/" + pad2(r.cell) + ": '" + v + "' not in roster, skipped"); return; }
       v = c;
     }
-    st.rulings[itemKey(it)] = { v: v, id: it.id, t: Date.now() };
-    applied++;
+    setRuling(i, v); applied++;
+  });
+  sp.ids.forEach(function (id) {
+    const i = byId.get(id);
+    if (i === undefined) { noneMissing++; return; }
+    setRuling(i, NONE); noneApplied++;
   });
   save();
-  $("impmsg").textContent = "applied " + applied + " cells; " + missing + " cells not in this data file"
+  $("impmsg").textContent = "applied " + applied + " cells and " + noneApplied + " no-character ids; "
+    + missing + " cells and " + noneMissing + " ids not in this data file"
     + (errs.length ? "\n" + errs.slice(0, 12).join("\n") + (errs.length > 12 ? "\n…" + (errs.length - 12) + " more" : "") : "");
   $("impmsg").style.color = errs.length ? "var(--accent)" : "var(--green)";
-  openExport();
+  openExport(2);
 }
 
 // ---------- keyboard ----------
@@ -562,67 +862,83 @@ document.addEventListener("keydown", function (e) {
     if (e.key === "o" || e.key === "O" || e.key === "Enter") { e.preventDefault(); $("file").click(); }
     return;
   }
-  if (e.ctrlKey || e.metaKey || e.altKey) return;     // leave browser shortcuts alone
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
   const inField = /^(TEXTAREA|INPUT)$/.test(e.target.tagName) && !e.target.readOnly;
 
   if ($("overlay").classList.contains("on")) {
-    if (e.key === "Escape") { e.preventDefault(); closeExport(); }
-    else if (!inField && (e.key === "d" || e.key === "D")) { e.preventDefault(); download(); }
-    else if (!inField && (e.key === "c" || e.key === "C")) { e.preventDefault(); copyOut(); }
+    if (k === "Escape") { e.preventDefault(); closeExport(); }
+    else if (inField) return;
+    else if (k === "1" || k === "2" || k === "3") { e.preventDefault(); openExport(+k - 1); }
+    else if (k === "d" || k === "D") { e.preventDefault(); if (tab < 2) download(); }
+    else if (k === "c" || k === "C") { e.preventDefault(); if (tab < 2) copyOut(); }
     return;
   }
-  const it = D.items[idx];
-  const k = e.key;
 
-  if (filter) {
-    if (k === "Escape") { filter = ""; candSel = 0; }
+  if (grid) {
+    const gk = GRID_KEYS.indexOf(k);
+    if (gk >= 0) { e.preventDefault(); gridToggle(gk); }
+    else if (k === "Enter") { e.preventDefault(); gridAccept(); }
+    else if (k === "Escape" || k === "g" || k === "G") { e.preventDefault(); leaveGrid(); }
+    else if (k === "ArrowRight") { e.preventDefault(); gridPage(1); }
+    else if (k === "ArrowLeft") { e.preventDefault(); gridPage(-1); }
+    return;
+  }
+
+  const it = D.items[ord[cur]];
+  if (filter !== null) {
+    if (k === "Escape") { filter = null; candSel = 0; if (rejected) rejected = false; }
     else if (k === "Backspace") { filter = filter.slice(0, -1); candSel = 0; }
     else if (k === "ArrowDown") { candSel = Math.min(candSel + 1, Math.max(0, cands.length - 1)); }
     else if (k === "ArrowUp") { candSel = Math.max(candSel - 1, 0); }
     else if (k === "Enter") { e.preventDefault(); if (cands.length) rule(cands[candSel].name); return; }
     else if (k.length === 1 && /[A-Za-z \-']/.test(k)) { filter += k; candSel = 0; }
     else return;
-    e.preventDefault(); renderFilter(); return;
+    e.preventDefault(); render(); return;
   }
 
-  if (k.length === 1 && /[A-Za-z]/.test(k)) { e.preventDefault(); filter = k; candSel = 0; renderFilter(); return; }
   switch (k) {
     case "Enter": case "1":
       e.preventDefault();
       if (it._prop && !rejected) rule(it._prop);
-      else flash(it._prop ? "rejected — type a name" : "no proposal", "var(--red)");
+      else flash(it._prop ? "rejected — name it" : "no proposal", "var(--red)");
       return;
-    case "2": e.preventDefault(); rejected = !rejected; render(); return;
+    case "2": e.preventDefault(); rejected = true; filter = ""; render(); return;
     case "3": e.preventDefault(); rule("unknown"); return;
-    case "ArrowLeft": case "Backspace": e.preventDefault(); go(idx - 1); return;
-    case "ArrowRight": e.preventDefault(); go(idx + 1); return;
-    case ".": { e.preventDefault(); const n = nextUnruled(idx);
+    case "n": case "N": e.preventDefault(); rule(NONE); return;
+    case "/": e.preventDefault(); filter = ""; render(); return;
+    case "g": case "G":
+      e.preventDefault();
+      if (!it._prop) flash("grid needs a proposed name", "var(--red)");
+      else if (!enterGrid(it._prop, ord[cur])) flash("no open " + it._prop + " proposals", "var(--muted)");
+      return;
+    case "o": case "O": e.preventDefault(); toggleOrder(); return;
+    case "ArrowLeft": case "Backspace": e.preventDefault(); go(cur - 1); return;
+    case "ArrowRight": e.preventDefault(); advanceSkip(); return;
+    case ".": { e.preventDefault(); const n = nextOpen(cur);
       if (n < 0) flash("all ruled", "var(--green)"); else go(n); return; }
     case "Delete": e.preventDefault(); clearRuling(); return;
     case "=": e.preventDefault(); openExport(); return;
     case "Escape": if (rejected) { rejected = false; render(); } return;
   }
 });
+function advanceSkip() { if (queue.length || queue.total) advance(); else go(cur + 1); }
 
-function copyOut() {
-  const t = $("extext");
-  t.select();
-  (navigator.clipboard ? navigator.clipboard.writeText(t.value) : Promise.reject())
-    .catch(function () { document.execCommand("copy"); });
-  flash("copied", "var(--green)");
-}
-
-$("dl").onclick = download;
-$("cp").onclick = copyOut;
+$("dl").onclick = function () { tab = 0; download(); };
+$("cp").onclick = function () { tab = 0; copyOut(); };
+$("dlnone").onclick = function () { tab = 1; download(); };
+$("cpnone").onclick = function () { tab = 1; copyOut(); };
+document.querySelectorAll("#tabs button").forEach(function (b) { b.onclick = function () { openExport(+b.dataset.tab); }; });
 $("impgo").onclick = function () { applyImport($("imptext").value); };
 $("impfilebtn").onclick = function () { $("impfile").click(); };
 $("impfile").onchange = function (e) {
-  const f = e.target.files[0]; if (!f) return;
-  f.text().then(function (t) { $("imptext").value = t; applyImport(t); });
+  Promise.all([...e.target.files].map(function (f) { return f.text(); })).then(function (ts) {
+    const t = ts.join("\n"); $("imptext").value = t; applyImport(t);
+  });
 };
 $("orphanclear").onclick = function () {
   orphanKeys.forEach(function (k) { delete st.rulings[k]; });
-  orphanKeys = []; save(); openExport();
+  orphanKeys = []; save(); openExport(2);
 };
 $("pick").onclick = function () { $("file").click(); };
 $("file").onchange = function (e) {

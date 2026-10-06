@@ -1,29 +1,25 @@
 """
 drive_review.py -- open review.html from file:// in headless Chromium, drive
-it with the KEYBOARD ONLY, and check what it exports against an independent
-Python implementation of the cells.txt format. Takes screenshots.
+it with the KEYBOARD ONLY, and check every export against an independent
+Python model of what should have been ruled. Takes screenshots.
 
 usage: python drive_review.py <site_dir> <shots_dir>
-  <site_dir> must already hold gen_review_data.py output, with review.html
-  copied into <site_dir>/review/.
+  <site_dir> holds gen_review_data.py output with review.html copied into
+  <site_dir>/review/.
+     python drive_review.py --perf <site_dir>   timing only (use 2400 items)
 """
 import json
-import shutil
 import sys
+import time
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-SITE, SHOTS = Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve()
-SHOTS.mkdir(parents=True, exist_ok=True)
-URL = (SITE / "review" / "review.html").as_uri()
-DATA = json.loads((SITE / "review" / "review_data.json").read_text())
-ITEMS, ROSTER = DATA["items"], set(DATA["roster"])
 CHROME = next(Path("/opt/pw-browsers").glob("chromium-*/chrome-linux/chrome"))
 
 
+# ---- independent Python model of the export format and the grouped order ----
 def py_collapse(cells):
-    """Independent implementation, written separately from the JS one."""
     s = sorted(set(cells))
     runs, start = [], None
     for a, b in zip(s, s[1:] + [None]):
@@ -37,155 +33,221 @@ def py_collapse(cells):
 def py_lines(rul):
     groups = {}
     for (sheet, cell), v in rul.items():
-        groups.setdefault((sheet, v), []).append(cell)
+        if v != "#none":
+            groups.setdefault((sheet, v), []).append(cell)
     keys = sorted(groups, key=lambda k: (k[0], k[1] == "unknown", k[1]))
     return [f"{s}/{py_collapse(groups[(s, v)])} = {v}" for s, v in keys]
 
 
+def py_order(items, roster):
+    def prop(it):
+        return it["proposed"] if it["proposed"] in roster else None
+    names = sorted({prop(it) for it in items if prop(it)})
+    order = []
+    for n in names + [None]:
+        idx = [i for i, it in enumerate(items) if prop(it) == n]
+        idx.sort(key=lambda i: (items[i]["distance"] if isinstance(items[i]["distance"], (int, float)) else float("inf"), i))
+        order += idx
+    return order
+
+
 assert py_collapse([1, 2, 3, 5, 9, 10]) == "01-03,05,09-10" and py_collapse([7]) == "07"
 
-expected = {}          # (sheet, cell) -> value ; what the UI SHOULD hold
-errors = []
+
+def perf(site):
+    url = (Path(site) / "review" / "review.html").resolve().as_uri()
+    with sync_playwright() as pw:
+        br = pw.chromium.launch(executable_path=str(CHROME))
+        pg = br.new_page(viewport={"width": 1600, "height": 1000})
+        t = time.time(); pg.goto(url); pg.wait_for_selector("#app:not([hidden])")
+        print(f"load to first render: {time.time() - t:.2f}s  ({pg.inner_text('#counts')})")
+        def timed(label, keys, n):
+            t = time.time()
+            for _ in range(n):
+                for k in keys: pg.keyboard.press(k)
+            pg.inner_text("#counts")
+            print(f"{label}: {(time.time() - t) / n * 1000:.1f} ms per action over {n}")
+        timed("single accept (Enter)", ["Enter"], 200)
+        timed("single no-character (N)", ["n"], 100)
+        timed("grid open + accept 12 (G, Enter, Esc)", ["g", "Enter", "Escape"], 30)
+        timed("grid toggle (1)", ["g", "1", "1", "Escape"], 30)
+        t = time.time(); pg.keyboard.press("="); pg.wait_for_selector("#overlay.on")
+        print(f"export panel: {time.time() - t:.2f}s, {len(pg.input_value('#extext').splitlines())} lines")
+        br.close()
 
 
-def key(i):
-    return ITEMS[i]["sheet"], ITEMS[i]["cell"]
+def main(site, shots):
+    site, shots = Path(site).resolve(), Path(shots).resolve()
+    shots.mkdir(parents=True, exist_ok=True)
+    data = json.loads((site / "review" / "review_data.json").read_text())
+    items, roster = data["items"], set(data["roster"])
+    by_key = {f"{it['sheet']}/{it['cell']}": i for i, it in enumerate(items)}
+    prop = lambda i: items[i]["proposed"] if items[i]["proposed"] in roster else None
+    order = py_order(items, roster)
+    expected = {}                       # (sheet, cell) -> value
+    K = lambda i: (items[i]["sheet"], items[i]["cell"])
+    errors = []
+
+    with sync_playwright() as pw:
+        br = pw.chromium.launch(executable_path=str(CHROME))
+        ctx = br.new_context(viewport={"width": 1600, "height": 1000}, accept_downloads=True)
+        pg = ctx.new_page()
+        pg.on("pageerror", lambda e: errors.append(str(e)))
+        pg.goto((site / "review" / "review.html").as_uri())
+        pg.wait_for_selector("#app:not([hidden])")
+        press = pg.keyboard.press
+
+        def cur():                          # item index on screen (single mode)
+            return by_key[pg.inner_text("#frames .lab").split()[-1]]
+
+        def grid_items():
+            return [by_key[t.split("·")[0].split()[-1]] for t in pg.locator("#ggrid .gc:not(.empty) .gh").all_inner_texts()]
+
+        def ruled_count():
+            return sum(int(x) for x in pg.locator("#counts b").all_inner_texts()[:3])
+
+        # --- 1. grouped order and header ---
+        assert cur() == order[0], (cur(), order[0])
+        g0 = prop(order[0])
+        gsize = sum(1 for i in order if prop(i) == g0)
+        assert pg.inner_text("#wchar") == g0 and pg.inner_text("#wpos") == f"1 / {gsize}"
+        ngroups = len({prop(i) for i in order if prop(i)})
+        assert f"{ngroups - 1} more characters after this" in pg.inner_text("#wrest"), pg.inner_text("#wrest")
+        pg.wait_for_timeout(300)
+        pg.screenshot(path=str(shots / "01_grouped_single.png"))
+
+        # --- 2. single-mode actions ---
+        i = cur(); press("Enter"); expected[K(i)] = prop(i)
+        i = cur(); press("n"); expected[K(i)] = "#none"
+        i = cur(); press("3"); expected[K(i)] = "unknown"
+        i = cur(); press("/"); pg.keyboard.type("purp"); press("Enter"); expected[K(i)] = "PURPLE HORN"
+        i = cur(); press("2"); assert pg.locator("#filterbox.active").count() == 1
+        pg.keyboard.type("frog"); press("Enter"); expected[K(i)] = "GREEN FROG"
+        pos_before = pg.inner_text("#wpos")
+        assert pos_before == f"6 / {gsize}", pos_before
+        assert f"{gsize - 5} unruled left in {g0}" in pg.inner_text("#wrest"), pg.inner_text("#wrest")
+        assert ruled_count() == 5
+
+        # --- 3. grid: toggles, Esc rules nothing, paging rules nothing ---
+        big = max({prop(i) for i in order if prop(i)}, key=lambda n: sum(prop(i) == n for i in order))
+        # jump to the biggest group with "." navigation: switch order is not needed, use G on an item of it
+        while prop(cur()) != big:
+            press("ArrowRight")
+        press("g")
+        pg.wait_for_selector("#gridview.on")
+        assert pg.inner_text("#gtitle b") == big
+        shown = grid_items()
+        assert len(shown) == 12 and all(prop(i) == big for i in shown)
+        for k in ["2", "5", "="]:
+            press(k)
+        assert pg.locator("#ggrid .gc.wrong").count() == 3
+        pg.wait_for_timeout(300)
+        pg.screenshot(path=str(shots / "02_grid_three_marked_wrong.png"))
+        press("Escape")
+        assert ruled_count() == 5, "Esc from grid must rule nothing"
+        press("g"); press("ArrowRight")
+        assert grid_items() != shown and ruled_count() == 5
+        press("ArrowLeft"); assert grid_items() == shown and pg.locator("#ggrid .gc.wrong").count() == 0
+        # --- 4. grid accept: 2 wrong -> named one at a time, rest accepted ---
+        press("1"); press("4")
+        wrong = [shown[0], shown[3]]
+        press("Enter")
+        for j in shown:
+            if j not in wrong:
+                expected[K(j)] = big
+        assert pg.locator("#gridview.on").count() == 0
+        assert cur() == wrong[0] and pg.locator("#prop.rejected").count() == 1
+        assert "1 of 2" in pg.inner_text("#queue"), pg.inner_text("#queue")
+        pg.wait_for_timeout(500)
+        pg.screenshot(path=str(shots / "03_grid_wrong_sent_to_naming.png"))
+        pg.keyboard.type("cow"); press("Enter"); expected[K(wrong[0])] = "COW"
+        assert cur() == wrong[1] and "2 of 2" in pg.inner_text("#queue")
+        press("Escape"); press("n"); expected[K(wrong[1])] = "#none"
+        # queue drained -> back in the grid on the same character
+        pg.wait_for_selector("#gridview.on")
+        assert pg.inner_text("#gtitle b") == big
+        page2 = grid_items()
+        assert not set(page2) & set(shown)
+        press("Enter")
+        for j in page2:
+            expected[K(j)] = big
+        pg.wait_for_timeout(250)
+        pg.screenshot(path=str(shots / "04_grid_next_page.png"))
+        press("Escape")
+        assert ruled_count() == len(expected), (ruled_count(), len(expected))
+
+        # --- 5. original order toggle and back ---
+        press("o"); assert "/" in pg.inner_text("#wchar") and "original order" in pg.inner_text("#wrest")
+        press("o"); assert pg.inner_text("#wrest").find("after this") > 0
+
+        # --- 6. reload keeps everything ---
+        before = pg.inner_text("#counts")
+        pg.reload(); pg.wait_for_selector("#app:not([hidden])")
+        assert pg.inner_text("#counts") == before
+
+        # --- 7. the three export panels ---
+        want_lines = py_lines(expected)
+        want_ids = sorted(items[by_key[f"{s}/{c}"]]["id"] for (s, c), v in expected.items() if v == "#none")
+        press("=")
+        pg.wait_for_selector("#overlay.on")
+        got_lines = pg.input_value("#extext").strip().splitlines()
+        if got_lines != want_lines:
+            print("ONLY IN PAGE:", sorted(set(got_lines) - set(want_lines)))
+            print("ONLY IN MODEL:", sorted(set(want_lines) - set(got_lines)))
+        assert got_lines == want_lines
+        pg.wait_for_timeout(200)
+        pg.screenshot(path=str(shots / "05_export_rulings.png"))
+        with pg.expect_download() as dl1:
+            press("d")
+        dl1.value.save_as(str(shots / "downloaded_rulings.txt"))
+        press("2")
+        assert pg.input_value("#nonetext").strip().splitlines() == want_ids
+        pg.wait_for_timeout(500)
+        pg.screenshot(path=str(shots / "06_export_no_character_ids.png"))
+        with pg.expect_download() as dl2:
+            press("d")
+        dl2.value.save_as(str(shots / "downloaded_no_character_ids.txt"))
+        press("3")
+        pg.wait_for_timeout(500)
+        pg.screenshot(path=str(shots / "07_export_restore.png"))
+        press("Escape")
+        assert (shots / "downloaded_rulings.txt").read_text().strip().splitlines() == want_lines
+        assert (shots / "downloaded_no_character_ids.txt").read_text().strip().splitlines() == want_ids
+        for line in want_lines:
+            assert "#none" not in line
+
+        # --- 8. wipe storage, restore from BOTH downloads ---
+        pg.evaluate("localStorage.clear()")
+        pg.reload(); pg.wait_for_selector("#app:not([hidden])")
+        assert ruled_count() == 0
+        press("="); press("3")
+        pg.focus("#imptext")
+        pg.keyboard.insert_text((shots / "downloaded_rulings.txt").read_text()
+                                + (shots / "downloaded_no_character_ids.txt").read_text())
+        pg.click("#impgo")
+        msg = pg.inner_text("#impmsg")
+        press("Escape"); press("=")
+        assert pg.input_value("#extext").strip().splitlines() == want_lines, msg
+        press("2")
+        assert pg.input_value("#nonetext").strip().splitlines() == want_ids, msg
+        pg.screenshot(path=str(shots / "08_restored_import.png"))
+        br.close()
+
+    named = sum(1 for v in expected.values() if v not in ("unknown", "#none"))
+    print(f"grouped order matched the Python model; header counts and positions correct")
+    print(f"grid: 3 toggles shown, Esc ruled nothing, paging ruled nothing, Enter ruled 10 + sent 2 to naming,")
+    print(f"      queue drained back into the grid, second page accepted with Enter")
+    print(f"ruled {len(expected)}: {named} named, "
+          f"{sum(v == 'unknown' for v in expected.values())} unknown, {len(want_ids)} no-character")
+    print(f"exports matched the Python model: {len(want_lines)} cells.txt lines, {len(want_ids)} ids; "
+          f"no '#none' leaked into cells.txt")
+    print("reload kept the session; wipe + import of both downloads restored it exactly")
+    print(f"page errors: {errors or 'none'}")
+    print("DRIVE PASSED")
 
 
-def prop(i):
-    p = ITEMS[i]["proposed"]
-    return p if p in ROSTER else None
-
-
-with sync_playwright() as pw:
-    br = pw.chromium.launch(executable_path=str(CHROME))
-    ctx = br.new_context(viewport={"width": 1600, "height": 1000}, accept_downloads=True)
-    pg = ctx.new_page()
-    pg.on("console", lambda m: m.type == "error" and errors.append(m.text))
-    pg.on("pageerror", lambda e: errors.append(str(e)))
-    pg.goto(URL)
-    pg.wait_for_selector("#app:not([hidden])")
-    pg.wait_for_timeout(400)
-    where = lambda: pg.inner_text("#where")
-    status = lambda: pg.inner_text("#status")
-    assert where().startswith(f"{ITEMS[0]['sheet']}/{ITEMS[0]['cell']}"), where()
-    pg.screenshot(path=str(SHOTS / "01_main_view.png"))
-    K = pg.keyboard.press
-
-    def at(i):
-        assert where().startswith(f"{ITEMS[i]['sheet']}/{ITEMS[i]['cell']} "), (i, where())
-
-    i = 0
-    # 0: accept with Enter (or 3 if no proposal)
-    at(i)
-    if prop(i): K("Enter"); expected[key(i)] = prop(i)
-    else: K("3"); expected[key(i)] = "unknown"
-    i += 1
-    # 1: unknown
-    at(i); K("3"); expected[key(i)] = "unknown"; i += 1
-    # 2: reject, then name it via an ALIAS ("pink" -> PIG)
-    at(i); K("2"); pg.keyboard.type("pink"); pg.wait_for_timeout(150)
-    pg.screenshot(path=str(SHOTS / "02_reject_then_filter_alias.png"))
-    assert "PIG" in pg.inner_text("#cands").splitlines()[0], pg.inner_text("#cands")
-    assert pg.inner_text("#refname") == "PIG"
-    K("Enter"); expected[key(i)] = "PIG"; i += 1
-    # 3: type "l", arrow down to the 2nd candidate, assign it
-    at(i); pg.keyboard.type("l"); pg.wait_for_timeout(150)
-    cands = pg.inner_text("#cands").splitlines()
-    pg.screenshot(path=str(SHOTS / "03_filter_candidates.png"))
-    K("ArrowDown"); second = cands[1].split("  (")[0].strip()
-    K("Enter"); expected[key(i)] = second; i += 1
-    # 4: (missing 3rd frame) -- screenshot, then accept/unknown
-    at(i); pg.wait_for_timeout(300)
-    assert "missing:" in pg.inner_text("#frames")
-    if prop(i): K("1"); expected[key(i)] = prop(i)
-    else: K("3"); expected[key(i)] = "unknown"
-    i += 1
-    # 5: skip with ArrowRight -- must emit nothing
-    at(i); K("ArrowRight"); i += 1
-    # 6: Escape out of a half-typed filter, then accept
-    at(i); pg.keyboard.type("wo"); K("Escape")
-    assert pg.inner_text("#cands").strip() == ""
-    if prop(i): K("Enter"); expected[key(i)] = prop(i)
-    else: K("3"); expected[key(i)] = "unknown"
-    i += 1
-    # 7: proposal not in roster -> Enter must NOT rule or advance
-    at(i); assert ITEMS[i]["proposed"] == "PHOENIX"
-    K("Enter"); at(i); assert status() == "not yet ruled"
-    K("3"); expected[key(i)] = "unknown"; i += 1
-    # 8..29: accept everything that has a proposal, unknown otherwise
-    while i < 30:
-        at(i)
-        if prop(i): K("Enter"); expected[key(i)] = prop(i)
-        else: K("3"); expected[key(i)] = "unknown"
-        i += 1
-    # back three, clear one ruling with Delete
-    for _ in range(3): K("ArrowLeft")
-    at(27); K("Delete"); expected.pop(key(27)); assert status() == "not yet ruled"
-    # back to the skipped item 5 -- still unruled
-    for _ in range(22): K("ArrowLeft")
-    at(5); assert status() == "not yet ruled"
-    # "." jumps to the next unruled item: that is 27 (5 is current)
-    K("."); at(27)
-    pg.wait_for_timeout(300)
-    pg.screenshot(path=str(SHOTS / "04_main_view_midsession.png"))
-
-    # --- reload: session must survive ---
-    before = pg.inner_text("#counts")
-    pg.reload(); pg.wait_for_selector("#app:not([hidden])"); pg.wait_for_timeout(300)
-    assert pg.inner_text("#counts") == before, (before, pg.inner_text("#counts"))
-    at(27)
-
-    # --- export panel ---
-    K("=")
-    pg.wait_for_selector("#overlay.on"); pg.wait_for_timeout(200)
-    got = pg.input_value("#extext").strip().splitlines()
-    want = py_lines(expected)
-    pg.screenshot(path=str(SHOTS / "05_export_panel.png"))
-    assert got == want, "\n".join(["GOT:"] + got + ["WANT:"] + want)
-    with pg.expect_download() as dl:
-        K("d")
-    dl_path = SHOTS / "downloaded_rulings.txt"
-    dl.value.save_as(str(dl_path))
-    assert dl_path.read_text().strip().splitlines() == want
-    exported = dl_path.read_text()
-    K("Escape")
-
-    # --- storage wiped -> restore from the downloaded file ---
-    pg.evaluate("localStorage.clear()")
-    pg.reload(); pg.wait_for_selector("#app:not([hidden])"); pg.wait_for_timeout(200)
-    assert pg.inner_text("#counts").startswith("0 ruled"), pg.inner_text("#counts")
-    K("=")
-    pg.focus("#imptext"); pg.keyboard.insert_text(exported)
-    pg.click("#impgo")
-    pg.wait_for_timeout(200)
-    msg = pg.inner_text("#impmsg")
-    pg.screenshot(path=str(SHOTS / "06_restored_from_download.png"))
-    assert pg.input_value("#extext").strip().splitlines() == want, msg
-    assert msg.startswith(f"applied {len(expected)} cells"), msg
-    K("Escape")
-
-    # --- no review_data.js: loader + file picker fallback ---
-    bare = SITE / "review_bare"
-    bare.mkdir(exist_ok=True)
-    shutil.copy(SITE / "review" / "review.html", bare / "review.html")
-    pg2 = ctx.new_page()
-    pg2.on("pageerror", lambda e: errors.append("bare: " + str(e)))
-    pg2.goto((bare / "review.html").as_uri())
-    pg2.wait_for_selector("#loader.on")
-    pg2.screenshot(path=str(SHOTS / "07_loader_without_data_js.png"))
-    pg2.set_input_files("#file", str(SITE / "review" / "review_data.json"))
-    pg2.wait_for_selector("#app:not([hidden])")
-    assert pg2.inner_text("#counts").split(" ruled")[0] == str(len(expected))  # shares storage
-
-    br.close()
-
-console_errs = [e for e in errors if "Failed to load resource" not in e]
-print(f"ruled {len(expected)} items over {len(set(s for s, _ in expected))} sheets; "
-      f"export matched the independent Python formatter line for line ({len(want)} lines)")
-print("reload kept the session; wipe + import of the downloaded file restored it exactly")
-print("loader fallback (no review_data.js) loaded the JSON via the file picker")
-print(f"page/console errors: {console_errs or 'none'} "
-      f"(+{len(errors) - len(console_errs)} expected 404s: the missing frame, missing review_data.js)")
-print("\n".join(want))
-print("DRIVE PASSED")
+if __name__ == "__main__":
+    if sys.argv[1] == "--perf":
+        perf(sys.argv[2])
+    else:
+        main(sys.argv[1], sys.argv[2])

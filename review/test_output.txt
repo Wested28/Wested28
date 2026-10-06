@@ -24,5 +24,11 @@ buildLines
   ok  nothing ruled -> no lines
 parseLines
   ok  parses own output back, ignores comments/blank, reports junk
+splitIdLines (no-character import)
+  ok  ids split from cells lines; comments ok; case folded
+  ok  a cells line is never mistaken for an id
+groupOrder (grouped review order)
+  ok  by name, distance ascending, null distance last, no-proposal group last, ties stable
+  ok  every index appears exactly once (500 random rows)
 
-ALL 21 TESTS PASSED
+ALL 25 TESTS PASSED

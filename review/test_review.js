@@ -10,7 +10,7 @@ const assert = require("assert");
 const html = fs.readFileSync(process.argv[2] || path.join(__dirname, "review.html"), "utf8");
 const m = /\/\/ ===== BEGIN PURE[^\n]*\n([\s\S]*?)\/\/ ===== END PURE/.exec(html);
 if (!m) throw new Error("PURE block not found in review.html");
-const P = new Function(m[1] + "\nreturn {collapseCells, expandCells, buildLines, parseLines};")();
+const P = new Function(m[1] + "\nreturn {collapseCells, expandCells, buildLines, parseLines, splitIdLines, groupOrder};")();
 
 let n = 0;
 function t(name, fn) { fn(); n++; console.log("  ok  " + name); }
@@ -76,6 +76,37 @@ t("parses own output back, ignores comments/blank, reports junk", () => {
   assert.strictEqual(p.ok.length, 7);
   assert.deepStrictEqual(p.ok[6], { sheet: "A053", cell: 5, value: "PINK PIG" });
   assert.strictEqual(p.errors.length, 2);
+});
+
+
+console.log("splitIdLines (no-character import)");
+t("ids split from cells lines; comments ok; case folded", () => {
+  const r = P.splitIdLines("N047/01-03 = SHARK\na1b2c3d4e5f6\nA1B2C3D4E5F7  # bg\nN047/07 = unknown\nnot-an-id\n");
+  assert.deepStrictEqual(r.ids, ["a1b2c3d4e5f6", "a1b2c3d4e5f7"]);
+  const p = P.parseLines(r.rest);
+  assert.strictEqual(p.ok.length, 4); assert.strictEqual(p.errors.length, 1);
+});
+t("a cells line is never mistaken for an id", () => assert.deepStrictEqual(P.splitIdLines("N047/12 = PIG").ids, []));
+
+console.log("groupOrder (grouped review order)");
+t("by name, distance ascending, null distance last, no-proposal group last, ties stable", () => {
+  const rows = [
+    { prop: "SHARK", distance: 0.20 }, { prop: null, distance: null }, { prop: "LION", distance: 0.05 },
+    { prop: "SHARK", distance: 0.01 }, { prop: "SHARK", distance: null }, { prop: "LION", distance: 0.05 },
+    { prop: "BEAR", distance: 0.3 },
+  ];
+  const g = P.groupOrder(rows);
+  assert.deepStrictEqual(g.groups.map(x => x.name), ["BEAR", "LION", "SHARK", null]);
+  assert.deepStrictEqual(g.order, [6, 2, 5, 3, 0, 4, 1]);
+});
+t("every index appears exactly once (500 random rows)", () => {
+  let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const names = ["A", "B", "C", null];
+  const rows = Array.from({ length: 500 }, () => ({ prop: names[Math.floor(rnd() * 4)], distance: rnd() < 0.1 ? null : rnd() }));
+  const g = P.groupOrder(rows);
+  assert.deepStrictEqual([...g.order].sort((a, b) => a - b), rows.map((_, i) => i));
+  g.groups.forEach(gr => { for (let i = 1; i < gr.idx.length; i++) {
+    const a = rows[gr.idx[i - 1]].distance ?? Infinity, b = rows[gr.idx[i]].distance ?? Infinity; assert.ok(a <= b); } });
 });
 
 console.log(`\nALL ${n} TESTS PASSED`);

@@ -1,101 +1,79 @@
-# Job 2: review.html
+# review.html: Job 3 (grouped order, grid mode, no-character outcome)
 
-Ran in a Claude Code cloud session. Job 1 still has one open item: the real-model decode never ran, because `huggingface.co` is blocked here.
+Ran in a Claude Code cloud session. Verified on synthetic data only (500 items, 15 characters, 25 sheets of 20 cells), driven by keyboard in headless Chromium from `file://`. The data schema is unchanged from v1.
 
-## Files
+## What changed
 
-| file | what |
+1. **Grouped by character (the default).** Items are ordered by proposed name, then by distance ascending. Clips without a usable proposal come last. The header shows:
+   - the character
+   - your position within it
+   - how many of that character are unruled
+   - how many characters with open items come after it (the no-proposal bucket is counted separately)
+
+   `O` switches between grouped and original order; the setting is remembered.
+
+2. **Grid mode (`G`).**
+   - Shows up to 12 open proposals of the current character, with up to 8 of its references pinned above.
+   - Every cell shows all three frames.
+   - **Marking wrong:** `1`–`9`, `0`, `-`, `=` (or a click) mark a cell WRONG: red border, greyed frames, diagonal red hatching, a large "✕ WRONG".
+   - **Enter** accepts the cells not marked wrong. The wrong ones go to one-at-a-time naming, with the name search already open ("from grid: marked wrong — name it (1 of 2)"). When those are done, you return to the grid on the same character.
+   - **Nothing implicit:** `→`/`←` page and `Esc` leaves. Neither rules anything, and both were tested. Page marks reset when you page.
+   - Once a character is finished, the next Enter moves the grid to the next character that still has open proposals.
+
+3. **`N` = no character.** It is stored separately from `unknown`. The header counts four states: named, unknown, no character, unruled. No-character clips export as plain ids in their own panel and their own download; they are never written into `cells.txt`, and the test checks for that.
+
+4. **Evidence label.** One line, always on screen in the guess panel: "MACHINE GUESS — evidence, not a verdict; unmeasured here". The grid footer repeats it. Agreement shows as "2/3 frames agree".
+
+### Key change from Job 2
+
+The name search now opens with `/`. `G` and `N` are letters, so letters can no longer start the search directly; otherwise a name beginning with G or N would trigger a command. `2` (reject) also opens the search straight away.
+
+### Two fixes found while testing
+
+- The header counted the no-proposal bucket as a character.
+- Searching ranked an alias match above a direct name match: `purp` put HARE ("purple hare") first. Direct name matches now win ties.
+
+## Key map
+
+| mode | keys |
 |---|---|
-| `review.html` | the tool: one file, vanilla JS, no network |
-| `gen_review_data.py` | synthetic frames and `review_data.json`/`.js` (`python gen_review_data.py <out> 60 1`) |
-| `test_review.js` | unit tests, run against the functions **extracted from review.html itself** (`node test_review.js`) |
-| `test_output.txt` | the passing run: 21 tests |
-| `drive_review.py` | opens the page from `file://` in headless Chromium, drives it with the keyboard only, and asserts the export |
-| `screenshots/` | 7 screenshots of the real UI, plus the `.txt` file the page downloaded |
+| one at a time | `Enter`/`1` accept · `2` reject → name · `3` unknown · `N` no character · `/` search names · `G` grid · `←` back · `→` skip · `.` next unruled · `Del` clear · `O` order · `=` export |
+| search open | type · `↑` `↓` pick · `Enter` assign · `Esc` close |
+| grid | `1`–`9` `0` `-` `=` toggle WRONG · `Enter` accept the rest · `→` `←` page · `Esc`/`G` leave |
+| export | `1` rulings · `2` no-character ids · `3` restore · `D` download · `C` copy · `Esc` close |
 
-## Data: put `review_data.js` beside the page, not just the JSON
+## Verified
 
-Chrome and Edge refuse `fetch()` of a sibling file under `file://`. That's why `browse.html` embeds its data. So the page loads data in this order:
+- **Unit tests: 25 pass** (`test_output.txt`), all run against the code inside `review.html`. That includes the range collapser, plus the new id-line import and grouped-order functions.
+- **`drive_review.py`** checked the grouped order and the header numbers against an independent Python model. It then exercised the grid:
+  - three cells marked
+  - `Esc` and paging ruled nothing
+  - Enter with 2 marked wrong ruled 10 and sent 2 to naming
+  - the naming queue returned to the grid
+  - a second page was accepted
+- **Exports** (20 `cells.txt` lines and the id list) matched the model line for line.
+- **Reload and restore:** the session survived a reload, and wiping storage then importing **both** downloads restored the session exactly.
 
-1. `<script src="review_data.js">`, a file containing `window.REVIEW_DATA = {…};`
-2. `fetch("review_data.json")`, which works over http and in some browsers
-3. A file picker: press `O` and choose the JSON. This was tested.
+**Timing at 2,400 items** (headless Chromium on Linux):
 
-Your generator should write the `.js` file. It is the same JSON, wrapped in one line.
-
-## Schema v1
-
-```json
-{
-  "version": 1,
-  "roster":  ["SHARK", "LION", "..."],
-  "aliases": {"ORANGE LION": "LION"},
-  "items": [
-    {"sheet": "N047", "cell": 12, "id": "a1b2c3d4e5f6",
-     "frames": ["../frames/a1b2c3d4e5f6_1.jpg", "../frames/a1b2c3d4e5f6_2.jpg", "../frames/a1b2c3d4e5f6_3.jpg"],
-     "proposed": "SHARK", "distance": 0.031, "agreement": 3}
-  ],
-  "refs": {"SHARK": ["../frames/x_2.jpg"]}
-}
-```
-
-| field | required? | type | rule |
-|---|---|---|---|
-| `roster` | required | list of strings | the only names the page can output |
-| `aliases` | optional | map, alias → roster name | lets you type "pink" and get PIG; the output is always the roster name |
-| `sheet` | required | string | |
-| `cell` | required | integer | `sheet/cell` must be unique, or the page refuses to load |
-| `id` | required | string | |
-| `frames` | required | list of up to 3 paths, relative to the HTML | |
-| `proposed` | optional | string or `null` | if it isn't in the roster (after aliases), accept is disabled for that item and it gets a warning |
-| `distance`, `agreement` | optional | number or `null` | display only |
-| `refs` | optional | map, name → list of paths | the first 8 are shown |
-
-## Key map (also shown on screen)
-
-| key | does |
+| action | time |
 |---|---|
-| `Enter` / `1` | accept the proposal, then move to the next item |
-| `2` | reject: crosses out the proposal; then type the correct name |
-| `3` | `unknown` |
-| letters | filter roster names and aliases (prefix, then word-prefix, then substring) |
-| `↑` `↓`, then `Enter` | pick a filtered name and assign it |
-| `Esc` | clear the filter |
-| `←` or `Backspace` | back one item |
-| `→` | skip, recording nothing |
-| `.` | jump to the next unruled item |
-| `Del` | clear this item's ruling |
-| `=` | export / restore panel; `D` download, `C` copy, `Esc` close |
+| load to first render | 0.15 s |
+| one-at-a-time accept | 6.2 ms |
+| no character (N) | 6.3 ms |
+| open grid + accept 12 | 59 ms |
+| grid toggle | 33 ms |
+| export panel | 0.03 s |
 
-Reject on its own writes nothing. A rejected item is only ruled once you name it or press `3`. That keeps "reject" from silently becoming `unknown`.
-
-## Output
-
-- The format is `SHEET/cells = NAME` or `SHEET/cells = unknown`.
-- There is one line per sheet per value. Sheets are sorted, names are alphabetical, and `unknown` comes last within each sheet.
-- Unruled and skipped items never emit a line.
-
-**Tested:** `[1,2,3,5,9,10]` → `01-03,05,09-10` and `[7]` → `07` both pass. Also covered:
-- numeric (not lexicographic) sort
-- de-duplication
-- cells ≥100
-- rejecting non-integers
-- 2,000 random sets that survive collapse → expand unchanged
-
-In the browser run, the export panel and the downloaded file matched a separately written Python formatter line for line. That run covered 28 rulings: accept, unknown, a name typed via an alias, an arrow-picked name, an item that was skipped, an item ruled then cleared, and a proposal not in the roster.
-
-## Persistence and recovery
-
-Rulings live in `localStorage` under the key `charpassReview.v1`, keyed by `sheet/cell` **and the clip id**.
-
-- **Rebuilt sheets:** sheet codes are positional, so after a rebuild a stored ruling whose id no longer matches is not applied or exported. The export panel shows a count of these, with a "Forget them" button.
-- **Reload:** survives a reload. Tested.
-- **Cleared storage:** the downloaded `.txt` is the backup. Paste or load it in the panel, and every line is ruled again. Tested: wipe storage, then import, gives an identical export.
-- **Reminder:** the header shows how many rulings haven't been downloaded yet, and turns yellow at 50 or more.
+Screenshots in `screenshots/`:
+- `01` grouped view
+- `02` grid with 3 marked wrong
+- `03` wrong cells sent to naming
+- `04` next grid page
+- `05`–`07` the three export panels
+- `08` after wipe + restore
 
 ## Not verified
 
-- Edge/Chrome on Windows, and real `file://` paths with spaces (`D:\Video Library\…`). I tested headless Chromium on Linux only. Paths with spaces should work, because image paths are relative, but I haven't run it.
-- Whether `localStorage` persists between `file://` pages in your browser profile. Chromium here persisted it across reloads.
-- Real frames and real roster size. Scale was tested synthetically: 2,400 items load in 0.14 s, a ruling takes about 6 ms per keypress, and the export takes 0.02 s.
-- The `C` copy key. Headless Chromium has no clipboard; it falls back to `execCommand`.
+- Edge/Chrome on Windows and real frames. All tests used synthetic data on Linux.
+- How fast grid pages fill on your disk. The 36 frames per page load from local JPGs, but I measured only the time to draw the page, not to decode the images.

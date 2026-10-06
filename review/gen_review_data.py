@@ -12,7 +12,10 @@ Each placeholder draws a coloured "helmet" figure for its character. The
 figure appears in only ONE of the three frames on about a third of the
 items -- the case the three-frame view exists for. A few items have no
 proposal, one proposes a name that is not in the roster, and one frame
-file is deliberately missing, so those paths get exercised too.
+file is deliberately missing, so those paths get exercised too. About 8%
+of clips contain no character at all (scenery only) but still carry a
+proposed name -- the nearest-neighbour failure the N key exists for.
+Sheets hold 20 cells each, like the real contact sheets.
 
 usage: python gen_review_data.py <out_dir> [n_items=60] [seed=1]
 """
@@ -31,6 +34,8 @@ ROSTER = {  # name -> (helmet colour, body colour)
     "COW": ((240, 240, 240), (30, 30, 30)), "GOAT": ((200, 190, 150), (90, 80, 60)),
     "WOLF": ((120, 120, 130), (60, 60, 70)), "CHICK": ((250, 220, 60), (240, 240, 200)),
     "IVORY LANCER": ((230, 225, 205), (150, 140, 120)), "OLIVE KNOT": ((120, 130, 40), (50, 60, 20)),
+    "ELEPHANT": ((130, 135, 140), (90, 30, 30)), "GREEN FROG": ((90, 220, 70), (30, 80, 30)),
+    "PURPLE HORN": ((150, 60, 200), (40, 20, 50)),
 }
 ALIASES = {"ORANGE LION": "LION", "BLUE BUNNY": "BUNNY", "PINK PIG": "PIG", "PURPLE HARE": "HARE"}
 
@@ -53,7 +58,7 @@ def frame(path, name, cid, k, show, rng):
         d.rectangle((cx - 40 * s, cy, cx + 40 * s, cy + 150 * s), fill=body)
         d.ellipse((cx - 45 * s, cy - 90 * s, cx + 45 * s, cy), fill=helm)
         d.rectangle((cx - 30 * s, cy - 55 * s, cx + 30 * s, cy - 40 * s), fill=(250, 40, 40))
-    d.text((8, 428), f"{cid}_{k}  {name or '?'}{'' if show else ' (off-screen)'}", fill=(235, 238, 245))
+    d.text((8, 428), f"{cid}_{k}  {name or 'NO CHARACTER'}{'' if show else ' (off-screen)'}", fill=(235, 238, 245))
     im.save(path, quality=85)
 
 
@@ -74,10 +79,9 @@ def main():
             refs[name].append(f"../frames/{cid}_2.jpg")
 
     items = []
-    sheets = ["N047", "N048", "V003"]
     for i in range(n):
-        sheet, cell = sheets[i * len(sheets) // n], i % (n // len(sheets)) + 1
-        truth = rng.choice(names)
+        sheet, cell = f"N{40 + i // 20:03d}", i % 20 + 1
+        truth = rng.choice(names) if rng.random() > 0.08 else None
         cid = fid(f"clip/{i}")
         only = rng.randint(1, 3) if rng.random() < 0.35 else None
         for k in (1, 2, 3):
@@ -85,7 +89,7 @@ def main():
                 continue  # one missing frame on purpose
             frame(out / "frames" / f"{cid}_{k}.jpg", truth, cid, k, only in (None, k), rng)
         r = rng.random()
-        proposed = None if r < 0.08 else (truth if r < 0.75 else rng.choice(names))
+        proposed = None if r < 0.05 else (truth or rng.choice(names)) if r < 0.85 else rng.choice(names)
         if i == 7:
             proposed = "PHOENIX"  # not in roster -> accept must be disabled
         items.append({
@@ -101,7 +105,7 @@ def main():
     js = json.dumps(data, indent=1)
     (out / "review" / "review_data.json").write_text(js, encoding="utf-8")
     (out / "review" / "review_data.js").write_text(f"window.REVIEW_DATA = {js};\n", encoding="utf-8")
-    print(f"{len(items)} items on {len(sheets)} sheets, {len(names)} roster names, "
+    print(f"{len(items)} items on {len({it['sheet'] for it in items})} sheets, {len(names)} roster names, "
           f"{sum(len(v) for v in refs.values())} reference frames -> {out}")
 
 
