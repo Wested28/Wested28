@@ -1,0 +1,13 @@
+  ok  nearest character by single-link distance
+  ok  vote share: a singleton character can never be unanimous at k=3
+  ok  abs+vote: populated-class query accepted, singleton-class query sent to a human
+  ok  every method and combination runs
+  ok  'vote' alone is refused (it is a gate, not a ranking)
+  ok  LOO accept rate on references matches target_accept
+  ok  aggregate_clips: accepted only when all 3 frames pass and agree
+  ok  tune_threshold: whole set 0.921 precise; tightest-safe threshold 0.0232 keeps 65 clips at 1.000
+  ok  tune_threshold returns None when no threshold meets the target
+  calibrate 3,100 refs: 0.96s   classify 9,000 x 3,100: 2.36s
+  ok  runs at the real size
+
+ALL 10 CHECKS PASSED

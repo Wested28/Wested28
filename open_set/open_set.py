@@ -1,4 +1,9 @@
 """
+SUPERSEDED for the real reference set (92 characters, 75 with under 10
+clips): use open_set_v2.py and read REPORT_v2.md. The "knn" recommendation
+below assumed every character had 5+ references; on a long tail it is worse
+than a plain distance threshold.
+
 open_set.py -- "none of these characters" for nearest-neighbour naming over a
 precomputed CCIP distance matrix (SMALL = same character). numpy + stdlib.
 
