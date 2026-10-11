@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Character Namer</title>
+<style>
+:root{--bg:#101115;--panel:#181a20;--panel2:#1f222a;--line:#2c303a;
+  --text:#ebeef5;--muted:#8b91a1;--accent:#f5e500;--green:#78e696;--red:#ff6b6b;--new:#7cc4ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:14px/1.4 "Segoe UI",system-ui,sans-serif}
+kbd{display:inline-block;min-width:1.6em;padding:1px 5px;border:1px solid var(--line);
+  border-bottom-width:2px;border-radius:4px;background:var(--panel2);color:var(--accent);
+  font:600 12px/1.3 Consolas,monospace;text-align:center}
+button{font:inherit;color:var(--bg);background:var(--accent);border:0;border-radius:4px;
+  padding:6px 12px;font-weight:600;cursor:pointer}
+button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+#app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
+header{display:flex;gap:18px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line)}
+header h1{font-size:15px;margin:0;color:var(--accent);letter-spacing:.04em}
+#where{font:600 15px Consolas,monospace}
+#prog{flex:1;display:flex;align-items:center;gap:10px;min-width:180px}
+#bar{flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden}
+#bar>div{height:100%;background:var(--green);width:0}
+#counts,#unsaved{color:var(--muted);white-space:nowrap}
+#unsaved.warn{color:var(--accent)}
+main{display:flex;flex-direction:column;gap:12px;padding:12px 16px;min-height:0}
+#frames{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.fr{position:relative;background:#000;border:1px solid var(--line);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  aspect-ratio:1;max-height:calc(100vh - 360px)}
+.fr img{max-width:100%;max-height:100%;object-fit:contain}
+.fr .lab{position:absolute;left:6px;top:4px;color:var(--muted);
+  font:600 12px Consolas,monospace;text-shadow:0 0 3px #000}
+#decide{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.3fr) minmax(0,1.1fr);
+  gap:12px;flex:1 1 0;min-height:190px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;
+  min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.card h2{margin:0 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+#guess{font-size:20px;font-weight:700;color:var(--muted);text-decoration:line-through}
+#meta{color:var(--muted);font:12px Consolas,monospace;margin-top:4px}
+#status{margin-top:10px;font-weight:700;font-size:17px;min-height:1.4em}
+#status.named{color:var(--green)} #status.newname{color:var(--new)}
+#status.mon{color:var(--accent)} #status.open{color:var(--muted)}
+#typed{font:700 24px Consolas,monospace;padding:8px 10px;border:2px solid var(--line);
+  border-radius:4px;background:var(--bg);min-height:48px;letter-spacing:.04em}
+#typed.active{border-color:var(--accent)}
+#typed .ph{color:var(--muted);font:400 14px "Segoe UI",system-ui;letter-spacing:0}
+#typed .caret{display:inline-block;width:11px;height:1.05em;background:var(--accent);
+  vertical-align:text-bottom;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+#sug{list-style:none;margin:8px 0 0;padding:0;overflow:auto;flex:1}
+#sug li{padding:4px 8px;border-radius:3px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+#sug li.sel{background:var(--accent);color:var(--bg)}
+#sug li .tag{font:400 11px Consolas,monospace;color:var(--muted)}
+#sug li.sel .tag{color:#3a3a10}
+#warn{margin-top:8px;color:var(--accent);font-weight:600;font-size:13px;min-height:1.2em}
+#grpname{font-size:17px;font-weight:700;color:var(--green);margin-bottom:6px}
+#grp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;overflow:auto;flex:1}
+#grp img{width:100%;aspect-ratio:1;object-fit:cover;border:1px solid var(--line);border-radius:3px;background:#000}
+#grpnone{color:var(--muted);font-size:13px}
+footer{border-top:1px solid var(--line);padding:6px 16px;display:flex;flex-wrap:wrap;
+  gap:4px 16px;color:var(--muted);font-size:13px}
+footer span{white-space:nowrap}
+#flash{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);font:800 34px/1 "Segoe UI";
+  padding:12px 30px;border-radius:8px;background:rgba(16,17,21,.9);pointer-events:none;opacity:0;
+  transition:opacity .25s;max-width:80vw;text-align:center}
+#flash.on{opacity:1;transition:none}
+#overlay{position:fixed;inset:0;background:rgba(8,9,12,.94);display:none;padding:26px;overflow:auto}
+#overlay.on{display:block}
+#ex{max-width:1150px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+#ex h3{margin:0 0 4px;font-size:14px;color:var(--accent)}
+#ex p{margin:0 0 8px;color:var(--muted);font-size:13px}
+textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);
+  border-radius:4px;font:13px/1.45 Consolas,monospace;padding:8px;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+#loader{max-width:660px;margin:12vh auto;padding:24px}
+#loader.on{display:block}
+</style>
+</head>
+<body>
+
+<div id="loader" class="card">
+  <h2>Character Namer</h2>
+  <p style="color:var(--muted)" id="loadmsg">Looking for <b>namer_data.js</b> beside this file…</p>
+  <div class="row"><button id="pick">Load namer_data.json</button>
+  <span style="color:var(--muted)">or press <kbd>O</kbd></span></div>
+  <input type="file" id="file" accept=".json,.js" hidden>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <h1>CHARACTER NAMER</h1><div id="where"></div>
+    <div id="prog"><div id="bar"><div></div></div><span id="counts"></span></div>
+    <span id="unsaved"></span>
+  </header>
+  <main>
+    <div id="frames"></div>
+    <div id="decide">
+      <div class="card">
+        <h2>Machine guessed (wrong)</h2>
+        <div id="guess"></div><div id="meta"></div><div id="status"></div>
+      </div>
+      <div class="card">
+        <h2>Type the name — <kbd>Enter</kbd> to assign</h2>
+        <div id="typed"></div>
+        <div id="warn"></div>
+        <ul id="sug"></ul>
+      </div>
+      <div id="refs" class="card">
+        <h2>Already given this name</h2>
+        <div id="grpname"></div><div id="grp"></div><div id="grpnone"></div>
+      </div>
+    </div>
+  </main>
+  <footer id="keys"></footer>
+</div>
+
+<div id="flash"></div>
+<div id="overlay"><div id="ex">
+  <div>
+    <h3>New characters — ADD THESE TO characters.json FIRST</h3>
+    <p>charpass_cells.py aborts the whole run on one unknown name.</p>
+    <textarea id="exnew" rows="10" readonly></textarea>
+    <div class="row"><button id="dnew">Download</button><button class="ghost" id="cnew">Copy</button></div>
+  </div>
+  <div>
+    <h3>Rulings for cells.txt</h3>
+    <p id="exsum"></p>
+    <textarea id="exrul" rows="18" readonly></textarea>
+    <div class="row"><button id="drul">Download</button><button class="ghost" id="crul">Copy</button>
+    <button class="ghost" id="close">Close (Esc)</button></div>
+  </div>
+  <div style="grid-column:1/-1">
+    <h3>Buckets — clip ids, NOT rulings</h3>
+    <p>cells.txt has only a name or <code>unknown</code>, and <code>unknown</code>
+    means "looked at, could not call it" — a different fact from "this is a
+    crowd". So these are plain id lists for you to sort, not lines to apply.</p>
+    <textarea id="exbuck" rows="12" readonly></textarea>
+    <div class="row"><button id="dbuck">Download</button><button class="ghost" id="cbuck">Copy</button></div>
+  </div>
+</div></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), E=(t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e;};
+const KEY="ag_namer_v1", EKEY="ag_namer_eject_v1";
+let D=null, items=[], roster=[], rosterSet=new Set();
+let st={}, ej={}, i=0, typed="", sel=0, sug=[], lastName="", downloaded=0;
+
+/* ---------- storage. Keyed by CLIP ID, never by position: sheet refs are
+   positional and a rebuilt sheet would otherwise re-point an old ruling. */
+function load(){
+  try{st=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){st={}}
+  try{ej=JSON.parse(localStorage.getItem(EKEY)||"{}")}catch(e){ej={}}
+}
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(st));
+      localStorage.setItem(EKEY,JSON.stringify(ej));}catch(e){}
+}
+
+/* ---------- groups ------------------------------------------------------
+   A group is a single-link cluster, which CHAINS: A near B and B near C
+   puts A and C together even when they are nothing alike. At the published
+   eps one group held 282 of 314 clips. So EJECT (X) exists, and applying a
+   name to a group (G) deliberately skips ejected clips and clips already
+   ruled something else. Naming a group is never silent: the flash says how
+   many it touched. */
+function groupOf(it){ return it && it.group!=null ? it.group : null; }
+function members(g){ return g==null?[]:items.filter(x=>x.group===g); }
+function ejected(it){ return !!ej[it.id]; }
+
+/* ---------- near-miss guard -------------------------------------------
+   This project has already had two invented names for characters the roster
+   held (CORAL LYNX for ROSE LYNX, IVORY MECHA for IVORY LANCER), each
+   costing clips that had to be found and moved back. So before a NEW name
+   is accepted, anything close is put in front of you. */
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
+  let p=Array.from({length:n+1},(_,j)=>j), c=new Array(n+1);
+  for(let x=1;x<=m;x++){c[0]=x;
+    for(let y=1;y<=n;y++)c[y]=Math.min(p[y]+1,c[y-1]+1,p[y-1]+(a[x-1]===b[y-1]?0:1));
+    [p,c]=[c,p];}
+  return p[n];
+}
+function nearMisses(name){
+  const w=new Set(name.split(/\s+/).filter(Boolean));
+  return allNames().filter(r=>{
+    if(r===name) return false;
+    if(lev(r,name)<=2) return true;
+    const rw=r.split(/\s+/);
+    return rw.some(x=>w.has(x));          // shares a whole word
+  }).slice(0,4);
+}
+function allNames(){
+  const s=new Set(roster);
+  Object.values(st).forEach(v=>{if(v&&v.name)s.add(v.name)});
+  return [...s].sort();
+}
+
+/* ---------- render ----------------------------------------------------- */
+function cur(){return items[i]}
+function isNew(n){return n && !rosterSet.has(n)}
+
+function draw(){
+  const it=cur(); if(!it)return;
+  $("#where").textContent=`${it.sheet}/${String(it.cell).padStart(2,"0")}`;
+  const fr=$("#frames"); fr.innerHTML="";
+  (it.frames||[]).slice(0,3).forEach((src,k)=>{
+    const d=E("div","fr"), img=new Image();
+    img.src=src; img.alt="";
+    img.onerror=()=>{d.innerHTML=`<span style="color:var(--red);font:12px Consolas">missing<br>${src}</span>`};
+    d.appendChild(img);
+    const l=E("div","lab"); l.textContent=["25%","50%","75%"][k]||""; d.appendChild(l);
+    fr.appendChild(d);
+  });
+  const g=groupOf(it);
+  if(it.nearest!==undefined&&!it.proposed){
+    $("#guess").textContent="nothing on the roster is close";
+    $("#guess").style.textDecoration="none";
+    $("#meta").textContent=`${it.id} · nearest was ${it.nearest||"—"} at `
+      +`${it.distance==null?"—":it.distance.toFixed(3)}`
+      +(g!=null?`  ·  group ${g}, ${it.group_size} clip(s)`:"");
+  }else{
+    $("#guess").textContent=it.proposed||"—";
+    $("#meta").textContent=`${it.id}  ·  dist ${it.distance==null?"—":it.distance.toFixed(4)}`;
+  }
+
+  const r=st[it.id];
+  const s=$("#status");
+  if(ejected(it)){s.className="mon";s.textContent="EJECTED from group";}
+  else if(!r){s.className="open";s.textContent="unnamed";}
+  else if(r.bucket||r.monster){
+    const b=BUCKETS[r.bucket||"monster"];
+    s.className="mon"; s.style.color=b.colour; s.textContent=b.label;}
+  else{s.className=isNew(r.name)?"newname":"named"; s.style.color="";
+       s.textContent=r.name+(isNew(r.name)?"   (new)":"");}
+
+  drawTyped(); drawSug(); drawGroup();
+  const done=items.filter(x=>st[x.id]).length;
+  $("#bar>div").style.width=(100*done/items.length)+"%";
+  $("#counts").textContent=`${done}/${items.length} named · ${i+1} of ${items.length}`;
+  const un=done-downloaded;
+  const u=$("#unsaved"); u.textContent=un>0?`${un} not downloaded`:"";
+  u.className=un>=25?"warn":"";
+}
+function drawTyped(){
+  const t=$("#typed"); t.className=typed?"active":"";
+  t.innerHTML = typed ? (typed+'<span class="caret"></span>')
+    : '<span class="ph">start typing a name — new names are allowed</span>';
+}
+function drawSug(){
+  const u=$("#sug"); u.innerHTML="";
+  $("#warn").textContent="";
+  if(!typed){ sug=[]; return; }
+  const q=typed.toUpperCase();
+  sug=allNames().filter(n=>n.includes(q));
+  const exact=allNames().includes(q);
+  if(!exact){
+    const near=nearMisses(q);
+    if(near.length) $("#warn").textContent="⚠ close to existing: "+near.join(", ")+" — pick one above if you meant it";
+  }
+  if(sel>=sug.length) sel=Math.max(0,sug.length-1);
+  sug.forEach((n,k)=>{
+    const li=E("li",k===sel?"sel":""); li.textContent=n;
+    const tag=E("span","tag"); tag.textContent=rosterSet.has(n)?"on roster":"new this session";
+    li.appendChild(tag); u.appendChild(li);
+  });
+  if(!exact&&typed){
+    const li=E("li",sug.length===0||sel>=sug.length?"sel":"");
+    li.textContent=q; const tag=E("span","tag"); tag.textContent="CREATE NEW";
+    tag.style.color="var(--new)"; li.appendChild(tag); u.appendChild(li);
+  }
+}
+function drawGroup(){
+  const it=cur(), gi=groupOf(it), box=$("#grp"); box.innerHTML="";
+  const h=$("#refs").querySelector("h2");
+  if(gi!=null){
+    /* Show the GROUP, because the judgement being asked is "are these all
+       one character?" and that cannot be made one clip at a time. */
+    const mem=members(gi);
+    const out=mem.filter(ejected).length;
+    const done=mem.filter(x=>st[x.id]&&st[x.id].name).length;
+    h.textContent="This group — Tab ejects, Shift+Enter names the rest";
+    $("#grpname").textContent=`group ${gi} · ${mem.length} clips · `
+      +`${done} named · ${out} ejected`;
+    $("#grpnone").textContent="";
+    mem.slice(0,24).forEach(x=>{
+      const im=new Image(); im.src=x.frames[1]||x.frames[0];
+      im.title=x.id;
+      if(x.id===it.id) im.style.outline="3px solid var(--accent)";
+      if(ejected(x)){ im.style.opacity=".25"; im.style.filter="grayscale(1)"; }
+      else if(st[x.id]&&st[x.id].name) im.style.outline="2px solid var(--green)";
+      im.onclick=()=>{ i=items.indexOf(x); typed=""; sel=0; draw(); };
+      box.appendChild(im);
+    });
+    return;
+  }
+  h.textContent="Already given this name";
+  const name=pending();
+  if(!name){$("#grpname").textContent="";$("#grpnone").textContent="type a name to see its clips";return;}
+  $("#grpname").textContent=name;
+  const mine=items.filter(x=>st[x.id]&&st[x.id].name===name);
+  $("#grpnone").textContent=mine.length?"":"no clips named this yet — this would be the first";
+  mine.slice(0,12).forEach(x=>{const im=new Image();im.src=x.frames[1]||x.frames[0];box.appendChild(im)});
+}
+function pending(){
+  if(!typed) return "";
+  const q=typed.toUpperCase();
+  if(sug.length&&sel<sug.length) return sug[sel];
+  return q;
+}
+function flash(msg,col){
+  const f=$("#flash"); f.textContent=msg; f.style.color=col||"var(--green)";
+  f.classList.add("on"); setTimeout(()=>f.classList.remove("on"),420);
+}
+
+/* ---------- actions ---------------------------------------------------- */
+function assign(name){
+  if(!name) return;
+  name=name.toUpperCase().trim().replace(/\s+/g," ");
+  if(!name) return;
+  st[cur().id]={name:name,sheet:cur().sheet,cell:cur().cell};
+  lastName=name; save(); typed=""; sel=0;
+  flash(name+(isNew(name)?"  (new)":""), isNew(name)?"var(--new)":"var(--green)");
+  next();
+}
+/* ---------- buckets ----------------------------------------------------
+   Three places a clip can go when it is not one clean name. They are NOT
+   cells.txt rulings and are exported as plain id lists, because the file's
+   own syntax only has a name or `unknown`, and `unknown` means "looked at,
+   could not call it" -- a different fact from "this is a crowd". Inventing
+   a syntax for the others would corrupt that distinction. */
+const BUCKETS={
+  monster:{label:"NOT A CHARACTER", colour:"var(--accent)"},
+  group:  {label:"GROUP / several characters", colour:"var(--new)"},
+  problem:{label:"PROBLEMATIC — come back to it", colour:"var(--red)"},
+};
+function bucket(kind){
+  const it=cur();
+  st[it.id]={bucket:kind,sheet:it.sheet,cell:it.cell};
+  save(); typed="";
+  flash(BUCKETS[kind].label, BUCKETS[kind].colour); next();
+}
+function bucketGroup(kind){
+  const it=cur(), gi=groupOf(it);
+  if(gi==null){ bucket(kind); return; }
+  const hit=members(gi).filter(x=>!ejected(x)&&!(st[x.id]&&st[x.id].name));
+  hit.forEach(x=>{ st[x.id]={bucket:kind,sheet:x.sheet,cell:x.cell}; });
+  save(); typed="";
+  flash(`${BUCKETS[kind].label} × ${hit.length}`, BUCKETS[kind].colour);
+  const nxt=items.findIndex((x,k)=>k>i&&groupOf(x)!==gi);
+  i=nxt<0?Math.min(i+1,items.length-1):nxt; draw();
+}
+function toggleEject(){
+  const it=cur();
+  if(groupOf(it)==null){ flash("no group to eject from","var(--accent)"); return; }
+  if(ej[it.id]) delete ej[it.id]; else ej[it.id]=true;
+  save(); flash(ej[it.id]?"ejected":"back in group","var(--accent)"); draw();
+}
+function applyGroup(name){
+  const it=cur(), gi=groupOf(it);
+  if(gi==null){ flash("no group","var(--accent)"); return; }
+  if(!name){ flash("type a name first","var(--accent)"); return; }
+  name=name.toUpperCase().trim().replace(/\s+/g," ");
+  /* Skips ejected clips AND clips already ruled something else, so pressing
+     G can never overwrite a decision you already made by hand. */
+  const hit=members(gi).filter(x=>!ejected(x)&&!(st[x.id]&&st[x.id].name));
+  hit.forEach(x=>{ st[x.id]={name:name,sheet:x.sheet,cell:x.cell}; });
+  lastName=name; save(); typed=""; sel=0;
+  flash(`${name} × ${hit.length}`, isNew(name)?"var(--new)":"var(--green)");
+  const nxt=items.findIndex((x,k)=>k>i&&groupOf(x)!==gi);
+  i=nxt<0?Math.min(i+1,items.length-1):nxt;
+  draw();
+}
+function clear(){ delete st[cur().id]; save(); typed=""; draw(); }
+function next(){ if(i<items.length-1){i++;} typed=""; sel=0; draw(); }
+function prev(){ if(i>0){i--;} typed=""; sel=0; draw(); }
+
+/* ---------- export ----------------------------------------------------- */
+function collapse(ns){
+  ns=[...new Set(ns)].sort((a,b)=>a-b); const out=[];
+  let s=null,p=null;
+  const push=()=>{ if(s===null)return;
+    out.push(s===p?String(s).padStart(2,"0")
+      :String(s).padStart(2,"0")+"-"+String(p).padStart(2,"0")); };
+  for(const n of ns){ if(s===null){s=p=n;continue;}
+    if(n===p+1){p=n;continue;} push(); s=p=n; }
+  push(); return out.join(",");
+}
+function buildExport(){
+  const bySheet={}, buckets={monster:[],group:[],problem:[]};
+  Object.entries(st).forEach(([id,r])=>{
+    if(!r) return;
+    const b=r.bucket||(r.monster?"monster":null);
+    if(b){ (buckets[b]||(buckets[b]=[])).push(id); return; }
+    if(!r.name) return;
+    (bySheet[r.sheet+"\u0000"+r.name] ||= []).push(Number(r.cell));
+  });
+  const lines=Object.keys(bySheet).sort().map(k=>{
+    const [sh,nm]=k.split("\u0000");
+    return `${sh}/${collapse(bySheet[k])} = ${nm}`;
+  });
+  const names=[...new Set(Object.values(st)
+    .filter(r=>r&&r.name&&isNew(r.name)).map(r=>r.name))].sort();
+  return {lines,names,buckets};
+}
+function bucketText(buckets){
+  const sec=(k,title,note)=>
+    `# ${title}  (${buckets[k].length})\n# ${note}\n`
+    + (buckets[k].length?buckets[k].join("\n"):"(none)") + "\n";
+  return [
+    sec("group","GROUP / SEVERAL CHARACTERS",
+        "more than one character in shot - not one name"),
+    sec("problem","PROBLEMATIC",
+        "confusing: come back to these, they are not decided"),
+    sec("monster","NOT A CHARACTER",
+        "monster, prop, crowd or no character at all"),
+  ].join("\n");
+}
+function openEx(){
+  const {lines,names,buckets}=buildExport();
+  $("#exrul").value=lines.join("\n");
+  $("#exnew").value=names.length?names.join("\n")
+    :"(none — every name you used is already on the roster)";
+  $("#exbuck").value=bucketText(buckets);
+  const nb=buckets.group.length+buckets.problem.length+buckets.monster.length;
+  $("#exsum").textContent=`${lines.length} line(s) for cells.txt. `
+    +`${nb} clip(s) are in the buckets below and are deliberately NOT here `
+    +`— they are not rulings, and cells.txt has no syntax for them.`;
+  $("#overlay").classList.add("on");
+}
+function dl(text,name){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([text],{type:"text/plain"}));
+  a.download=name; a.click(); URL.revokeObjectURL(a.href);
+  downloaded=Object.values(st).filter(r=>r&&!r.monster).length; draw();
+}
+
+/* ---------- keys ------------------------------------------------------- */
+const KEYS=[["Enter","name THIS clip"],["Shift+Enter","name the whole group"],
+  ["Tab","eject this clip from the group"],["↑ ↓","move through matches"],
+  ["`","reuse the last name you used"],["M","not a character"],
+  ["[ / {","GROUP — several characters (clip / whole group)"],
+  ["] / }","PROBLEMATIC — sort later (clip / whole group)"],
+  ["→ / ←","skip / back"],
+  ["Del","clear this clip"],["Esc","clear what you typed"],["=","export"]];
+function drawKeys(){ $("#keys").innerHTML=KEYS.map(([k,v])=>
+  `<span><kbd>${k}</kbd> ${v}</span>`).join(""); }
+
+document.addEventListener("keydown",e=>{
+  if($("#loader").style.display!=="none"&&!D){ if(e.key.toLowerCase()==="o")$("#file").click(); return; }
+  if($("#overlay").classList.contains("on")){ if(e.key==="Escape")$("#overlay").classList.remove("on"); return; }
+  if(e.ctrlKey||e.altKey||e.metaKey) return;
+  const k=e.key;
+  /* Group commands are NOT letters. Binding G and X would make them
+     unreachable inside a name, and GREEN GATOR / YELLOW GECKO are real
+     names in this roster. Shift+Enter and Tab never collide with typing. */
+  if(k==="Enter"&&e.shiftKey){ e.preventDefault(); applyGroup(pending()||lastName); return; }
+  if(k==="Enter"){ e.preventDefault(); assign(pending()); return; }
+  if(k==="Tab"){ e.preventDefault(); toggleEject(); return; }
+  /* Brackets, not letters: [ ] are outside the name charset so they can
+     never swallow a keystroke meant for a name. Shifted = whole group. */
+  if(k==="["){ bucket("group"); return; }
+  if(k==="{"){ bucketGroup("group"); return; }
+  if(k==="]"){ bucket("problem"); return; }
+  if(k==="}"){ bucketGroup("problem"); return; }
+  if(k==="ArrowDown"){ e.preventDefault(); sel=Math.min(sel+1,Math.max(sug.length,1)); drawSug(); drawGroup(); return; }
+  if(k==="ArrowUp"){ e.preventDefault(); sel=Math.max(sel-1,0); drawSug(); drawGroup(); return; }
+  if(k==="Escape"){ typed=""; sel=0; draw(); return; }
+  if(k==="Backspace"){ e.preventDefault(); typed=typed.slice(0,-1); sel=0; drawTyped(); drawSug(); drawGroup(); return; }
+  if(!typed){
+    if(k==="ArrowRight"){ next(); return; }
+    if(k==="ArrowLeft"){ prev(); return; }
+    if(k==="Delete"){ clear(); return; }
+    if(k==="="){ openEx(); return; }
+    if(k==="`"){ if(lastName){assign(lastName);} else flash("no previous name","var(--accent)"); return; }
+    if(k.toLowerCase()==="m"){ bucket("monster"); return; }
+  }
+  if(k.length===1&&/[a-zA-Z0-9 '\-]/.test(k)){ typed+=k.toUpperCase(); sel=0; drawTyped(); drawSug(); drawGroup(); }
+});
+
+/* ---------- boot ------------------------------------------------------- */
+function boot(data){
+  D=data; items=data.items||[]; roster=(data.roster||[]).map(s=>s.toUpperCase());
+  rosterSet=new Set(roster);
+  if(!items.length){ $("#loadmsg").textContent="The data file has no items."; return; }
+  const seen=new Set();
+  for(const it of items){ const k=it.sheet+"/"+it.cell;
+    if(seen.has(k)){ $("#loadmsg").textContent="Duplicate sheet/cell: "+k+". Not loading."; return; }
+    seen.add(k); }
+  load();
+  const firstOpen=items.findIndex(x=>!st[x.id]);
+  i=firstOpen<0?0:firstOpen;
+  downloaded=Object.values(st).filter(r=>r&&!r.monster).length;
+  $("#loader").style.display="none"; $("#app").hidden=false;
+  drawKeys(); draw();
+}
+$("#pick").onclick=()=>$("#file").click();
+$("#file").onchange=ev=>{ const f=ev.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{ let t=r.result.trim();
+    const m=t.match(/^window\.NAMER_DATA\s*=\s*([\s\S]*?);?\s*$/);
+    try{ boot(JSON.parse(m?m[1]:t)); }catch(e){ $("#loadmsg").textContent="Could not parse: "+e.message; } };
+  r.readAsText(f); };
+$("#drul").onclick=()=>dl($("#exrul").value,"namer_rulings.txt");
+$("#dnew").onclick=()=>dl($("#exnew").value,"namer_new_characters.txt");
+$("#dbuck").onclick=()=>dl($("#exbuck").value,"namer_buckets.txt");
+$("#crul").onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText($("#exrul").value)};
+$("#cnew").onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText($("#exnew").value)};
+$("#cbuck").onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText($("#exbuck").value)};
+$("#close").onclick=()=>$("#overlay").classList.remove("on");
+
+/* Chrome will not let a file:// page fetch a sibling .json, so the data
+   arrives as a script that assigns window.NAMER_DATA. The fetch is tried
+   anyway for the case where this is served over http. */
+(function(){
+  const s=document.createElement("script");
+  s.src="namer_data.js";
+  s.onload=()=>{ if(window.NAMER_DATA) boot(window.NAMER_DATA);
+    else $("#loadmsg").textContent="namer_data.js loaded but set nothing. Press O."; };
+  s.onerror=()=>{ fetch("namer_data.json").then(r=>r.json()).then(boot)
+    .catch(()=>{ $("#loadmsg").textContent=
+      "No namer_data.js beside this file. Press O and pick namer_data.json."; }); };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
