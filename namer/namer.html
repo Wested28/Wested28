@@ -76,6 +76,41 @@ textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(
   border-radius:4px;font:13px/1.45 Consolas,monospace;padding:8px;resize:vertical}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 #loader{max-width:660px;margin:12vh auto;padding:24px}
+/* ---- wall (singletons / groups) ---- */
+#wall{display:none;flex-direction:column;gap:8px;min-height:0;flex:1}
+#wall.on{display:flex}
+#whead{display:flex;gap:16px;align-items:baseline}
+#whead b{font-size:20px;color:var(--new)}
+#whead span{color:var(--muted)}
+#wgrid{display:grid;gap:8px;flex:1;min-height:0;align-content:start}
+.wc{position:relative;background:var(--panel);border:2px solid var(--line);border-radius:6px;padding:4px;
+  display:flex;flex-direction:column;gap:3px;cursor:pointer;user-select:none;min-height:0}
+.wc .wl{font:600 11px Consolas,monospace;color:var(--muted);display:flex;justify-content:space-between;gap:6px}
+.wc .wf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px}
+.wc .wf.g{grid-template-columns:repeat(3,minmax(0,1fr))}
+.wc .wf div{background:#000;aspect-ratio:1;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:2px}
+.wc .wf img{width:100%;height:100%;object-fit:contain;display:block}
+.wc.cur{outline:3px dashed var(--accent);outline-offset:3px}
+.wc.sel{border:4px solid var(--new);background:#14304a}
+.wc.sel::after{content:attr(data-n);position:absolute;top:-10px;right:-10px;min-width:30px;height:30px;padding:0 6px;
+  border-radius:15px;background:var(--new);color:#06121f;font:800 16px/30px "Segoe UI",sans-serif;text-align:center;
+  box-shadow:0 0 0 3px var(--bg)}
+.wc.sel .wf{box-shadow:inset 0 0 0 9999px rgba(124,196,255,.18)}
+.wc.sel .wf img{opacity:.85}
+#wbar{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:10px;align-items:start}
+#wsug{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+#wsug span{padding:2px 8px;border-radius:3px;background:var(--panel2);font-weight:600;font-size:13px}
+#wsug span.sel{background:var(--accent);color:var(--bg)}
+#wsug span i{font-style:normal;font:400 11px Consolas,monospace;color:var(--muted);margin-left:6px}
+#wsug span.sel i{color:#3a3a10}
+#confirm{display:none;position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:5;
+  background:var(--panel);border:3px solid var(--accent);border-radius:8px;padding:14px 20px;
+  max-width:min(900px,92vw);box-shadow:0 10px 40px rgba(0,0,0,.6)}
+#confirm.on{display:block}
+#confirm .q{font-size:20px;font-weight:700}
+#confirm .d{color:var(--muted);margin-top:4px;white-space:pre-line}
+#confirm .w{color:var(--accent);font-weight:600;margin-top:6px}
+#confirm .k{margin-top:10px;color:var(--muted)}
 #loader.on{display:block}
 </style>
 </head>
@@ -113,11 +148,21 @@ textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(
         <div id="grpname"></div><div id="grp"></div><div id="grpnone"></div>
       </div>
     </div>
+    <section id="wall">
+      <div id="whead"><b id="wtitle"></b><span id="wsub"></span></div>
+      <div id="wgrid"></div>
+      <div id="wbar" class="card">
+        <div><div id="wtyped"></div><div id="wsug"></div></div>
+        <div><div id="wsel" style="font-weight:700"></div><div id="wwarn" style="color:var(--accent);font-weight:600;margin-top:4px"></div></div>
+      </div>
+    </section>
   </main>
   <footer id="keys"></footer>
 </div>
 
 <div id="flash"></div>
+<div id="confirm"><div class="q" id="cq"></div><div class="d" id="cd"></div><div class="w" id="cw"></div>
+  <div class="k"><kbd>Enter</kbd> confirm &nbsp; <kbd>Esc</kbd> cancel — nothing is ruled until you confirm</div></div>
 <div id="overlay"><div id="ex">
   <div>
     <h3>New characters — ADD THESE TO characters.json FIRST</h3>
@@ -145,19 +190,101 @@ textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(
 <script>
 "use strict";
 const $=s=>document.querySelector(s), E=(t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e;};
-const KEY="ag_namer_v1", EKEY="ag_namer_eject_v1";
+const KEY="ag_namer_v1", EKEY="ag_namer_eject_v1", MKEY="ag_namer_merge_v1";
 let D=null, items=[], roster=[], rosterSet=new Set();
 let st={}, ej={}, i=0, typed="", sel=0, sug=[], lastName="", downloaded=0;
+let merges=[], into={}, rawMembers={}, mergeTarget=null, droppedMerges=0;
+let wall=null, confirmState=null, byId={};
+
+/* ===== BEGIN PURE (no DOM; extracted and unit-tested by test_namer.js) ===== */
+function collapse(ns){
+  ns=[...new Set(ns)].sort((a,b)=>a-b); const out=[];
+  let s=null,p=null;
+  const push=()=>{ if(s===null)return;
+    out.push(s===p?String(s).padStart(2,"0")
+      :String(s).padStart(2,"0")+"-"+String(p).padStart(2,"0")); };
+  for(const n of ns){ if(s===null){s=p=n;continue;}
+    if(n===p+1){p=n;continue;} push(); s=p=n; }
+  push(); return out.join(",");
+}
+function lev(a,b){
+  const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
+  let p=Array.from({length:n+1},(_,j)=>j), c=new Array(n+1);
+  for(let x=1;x<=m;x++){c[0]=x;
+    for(let y=1;y<=n;y++)c[y]=Math.min(p[y]+1,c[y-1]+1,p[y-1]+(a[x-1]===b[y-1]?0:1));
+    [p,c]=[c,p];}
+  return p[n];
+}
+/* Near-miss guard: within 2 edits, or shares a whole word. The shared word
+   is what catches CORAL LYNX / ROSE LYNX, IVORY MECHA / IVORY LANCER and
+   DEATH MAID / ONYX MAID (4-5 edits apart). BEAVER / LA BRUINE share no word
+   and are 8 edits apart: no text rule catches that one -- only looking does. */
+function nearMissesIn(name, names){
+  const w=new Set(name.split(/\s+/).filter(Boolean));
+  return names.filter(r=>{
+    if(r===name) return false;
+    if(lev(r,name)<=2) return true;
+    return r.split(/\s+/).some(x=>w.has(x));
+  }).slice(0,4);
+}
+/* Fingerprint of a set of clip ids (FNV-1a over the sorted ids). A saved
+   merge is only re-applied when both groups still hold exactly the clips
+   they held when you merged them -- group numbers are positional and a
+   rebuilt namer_data.js would otherwise re-point an old merge. */
+function sig(ids){
+  let h=0x811c9dc5; const t=[...ids].sort().join("|");
+  for(let k=0;k<t.length;k++){ h^=t.charCodeAt(k); h=Math.imul(h,0x01000193)>>>0; }
+  return h.toString(16)+":"+ids.length;
+}
+function resolveGroup(g, into){
+  let n=0; while(g!=null && into[g]!=null && n++<100000) g=into[g]; return g;
+}
+/* The one rule every bulk action goes through: anything already decided --
+   a name OR a bucket -- is skipped, and so is anything ejected. Both lists
+   come back so the caller can say what it touched and what it left alone. */
+function bulkSplit(ids, st, ej){
+  const hit=[], skipped=[];
+  ids.forEach(id=>{ if(st[id] || (ej && ej[id])) skipped.push(id); else hit.push(id); });
+  return {hit, skipped};
+}
+function buildExportFrom(st, rosterSet){
+  const bySheet={}, buckets={monster:[],group:[],problem:[]};
+  Object.entries(st).forEach(([id,r])=>{
+    if(!r) return;
+    const b=r.bucket||(r.monster?"monster":null);
+    if(b){ (buckets[b]||(buckets[b]=[])).push(id); return; }
+    if(!r.name) return;
+    (bySheet[r.sheet+"\u0000"+r.name] ||= []).push(Number(r.cell));
+  });
+  const lines=Object.keys(bySheet).sort().map(k=>{
+    const [sh,nm]=k.split("\u0000");
+    return `${sh}/${collapse(bySheet[k])} = ${nm}`;
+  });
+  const names=[...new Set(Object.values(st)
+    .filter(r=>r&&r.name&&!rosterSet.has(r.name)).map(r=>r.name))].sort();
+  return {lines,names,buckets};
+}
+/* ===== END PURE ===== */
 
 /* ---------- storage. Keyed by CLIP ID, never by position: sheet refs are
    positional and a rebuilt sheet would otherwise re-point an old ruling. */
 function load(){
   try{st=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){st={}}
   try{ej=JSON.parse(localStorage.getItem(EKEY)||"{}")}catch(e){ej={}}
+  let saved=[]; try{saved=JSON.parse(localStorage.getItem(MKEY)||"[]")}catch(e){saved=[]}
+  merges=[]; droppedMerges=0;
+  saved.forEach(m=>{
+    const ok=rawMembers[m.src]&&rawMembers[m.dst]
+      &&sig(rawMembers[m.src])===m.ssig&&sig(rawMembers[m.dst])===m.dsig;
+    if(ok) merges.push(m); else droppedMerges++;
+  });
+  rebuildInto();
 }
+function rebuildInto(){ into={}; merges.forEach(m=>{ into[m.src]=m.dst; }); }
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify(st));
-      localStorage.setItem(EKEY,JSON.stringify(ej));}catch(e){}
+      localStorage.setItem(EKEY,JSON.stringify(ej));
+      localStorage.setItem(MKEY,JSON.stringify(merges));}catch(e){}
 }
 
 /* ---------- groups ------------------------------------------------------
@@ -167,8 +294,9 @@ function save(){
    name to a group (G) deliberately skips ejected clips and clips already
    ruled something else. Naming a group is never silent: the flash says how
    many it touched. */
-function groupOf(it){ return it && it.group!=null ? it.group : null; }
-function members(g){ return g==null?[]:items.filter(x=>x.group===g); }
+function groupOf(it){ return it && it.group!=null ? resolveGroup(it.group, into) : null; }
+function members(g){ return g==null?[]:items.filter(x=>groupOf(x)===g); }
+function mergedFrom(g){ return Object.keys(rawMembers).map(Number).filter(r=>resolveGroup(r,into)===g); }
 function ejected(it){ return !!ej[it.id]; }
 
 /* ---------- near-miss guard -------------------------------------------
@@ -176,23 +304,7 @@ function ejected(it){ return !!ej[it.id]; }
    held (CORAL LYNX for ROSE LYNX, IVORY MECHA for IVORY LANCER), each
    costing clips that had to be found and moved back. So before a NEW name
    is accepted, anything close is put in front of you. */
-function lev(a,b){
-  const m=a.length,n=b.length; if(!m)return n; if(!n)return m;
-  let p=Array.from({length:n+1},(_,j)=>j), c=new Array(n+1);
-  for(let x=1;x<=m;x++){c[0]=x;
-    for(let y=1;y<=n;y++)c[y]=Math.min(p[y]+1,c[y-1]+1,p[y-1]+(a[x-1]===b[y-1]?0:1));
-    [p,c]=[c,p];}
-  return p[n];
-}
-function nearMisses(name){
-  const w=new Set(name.split(/\s+/).filter(Boolean));
-  return allNames().filter(r=>{
-    if(r===name) return false;
-    if(lev(r,name)<=2) return true;
-    const rw=r.split(/\s+/);
-    return rw.some(x=>w.has(x));          // shares a whole word
-  }).slice(0,4);
-}
+function nearMisses(name){ return nearMissesIn(name, allNames()); }
 function allNames(){
   const s=new Set(roster);
   Object.values(st).forEach(v=>{if(v&&v.name)s.add(v.name)});
@@ -221,7 +333,8 @@ function draw(){
     $("#guess").style.textDecoration="none";
     $("#meta").textContent=`${it.id} · nearest was ${it.nearest||"—"} at `
       +`${it.distance==null?"—":it.distance.toFixed(3)}`
-      +(g!=null?`  ·  group ${g}, ${it.group_size} clip(s)`:"");
+      +(g!=null?`  ·  group ${g}, ${members(g).length} clip(s)`
+        +(mergedFrom(g).length>1?` (merged from ${mergedFrom(g).length})`:""):"");
   }else{
     $("#guess").textContent=it.proposed||"—";
     $("#meta").textContent=`${it.id}  ·  dist ${it.distance==null?"—":it.distance.toFixed(4)}`;
@@ -283,8 +396,10 @@ function drawGroup(){
     const out=mem.filter(ejected).length;
     const done=mem.filter(x=>st[x.id]&&st[x.id].name).length;
     h.textContent="This group — Tab ejects, Shift+Enter names the rest";
+    const mf=mergedFrom(gi).length;
     $("#grpname").textContent=`group ${gi} · ${mem.length} clips · `
-      +`${done} named · ${out} ejected`;
+      +`${done} named · ${out} ejected`+(mf>1?` · merged from ${mf} groups`:"")
+      +(mergeTarget===gi?"  ★ merge target":"");
     $("#grpnone").textContent="";
     mem.slice(0,24).forEach(x=>{
       const im=new Image(); im.src=x.frames[1]||x.frames[0];
@@ -346,10 +461,12 @@ function bucket(kind){
 function bucketGroup(kind){
   const it=cur(), gi=groupOf(it);
   if(gi==null){ bucket(kind); return; }
-  const hit=members(gi).filter(x=>!ejected(x)&&!(st[x.id]&&st[x.id].name));
-  hit.forEach(x=>{ st[x.id]={bucket:kind,sheet:x.sheet,cell:x.cell}; });
+  /* bulkSplit skips clips already named OR already in a bucket, and ejected
+     ones -- an earlier hand decision is never overwritten by a bulk key. */
+  const {hit,skipped}=bulkSplit(members(gi).map(x=>x.id), st, ej);
+  hit.forEach(id=>{ const x=byId[id]; st[id]={bucket:kind,sheet:x.sheet,cell:x.cell}; });
   save(); typed="";
-  flash(`${BUCKETS[kind].label} × ${hit.length}`, BUCKETS[kind].colour);
+  flash(`${BUCKETS[kind].label} × ${hit.length}`+(skipped.length?` · skipped ${skipped.length}`:""), BUCKETS[kind].colour);
   const nxt=items.findIndex((x,k)=>k>i&&groupOf(x)!==gi);
   i=nxt<0?Math.min(i+1,items.length-1):nxt; draw();
 }
@@ -364,12 +481,11 @@ function applyGroup(name){
   if(gi==null){ flash("no group","var(--accent)"); return; }
   if(!name){ flash("type a name first","var(--accent)"); return; }
   name=name.toUpperCase().trim().replace(/\s+/g," ");
-  /* Skips ejected clips AND clips already ruled something else, so pressing
-     G can never overwrite a decision you already made by hand. */
-  const hit=members(gi).filter(x=>!ejected(x)&&!(st[x.id]&&st[x.id].name));
-  hit.forEach(x=>{ st[x.id]={name:name,sheet:x.sheet,cell:x.cell}; });
+  /* Skips ejected clips AND clips already decided -- named or bucketed. */
+  const {hit,skipped}=bulkSplit(members(gi).map(x=>x.id), st, ej);
+  hit.forEach(id=>{ const x=byId[id]; st[id]={name:name,sheet:x.sheet,cell:x.cell}; });
   lastName=name; save(); typed=""; sel=0;
-  flash(`${name} × ${hit.length}`, isNew(name)?"var(--new)":"var(--green)");
+  flash(`${name} × ${hit.length}`+(skipped.length?` · skipped ${skipped.length}`:""), isNew(name)?"var(--new)":"var(--green)");
   const nxt=items.findIndex((x,k)=>k>i&&groupOf(x)!==gi);
   i=nxt<0?Math.min(i+1,items.length-1):nxt;
   draw();
@@ -379,33 +495,7 @@ function next(){ if(i<items.length-1){i++;} typed=""; sel=0; draw(); }
 function prev(){ if(i>0){i--;} typed=""; sel=0; draw(); }
 
 /* ---------- export ----------------------------------------------------- */
-function collapse(ns){
-  ns=[...new Set(ns)].sort((a,b)=>a-b); const out=[];
-  let s=null,p=null;
-  const push=()=>{ if(s===null)return;
-    out.push(s===p?String(s).padStart(2,"0")
-      :String(s).padStart(2,"0")+"-"+String(p).padStart(2,"0")); };
-  for(const n of ns){ if(s===null){s=p=n;continue;}
-    if(n===p+1){p=n;continue;} push(); s=p=n; }
-  push(); return out.join(",");
-}
-function buildExport(){
-  const bySheet={}, buckets={monster:[],group:[],problem:[]};
-  Object.entries(st).forEach(([id,r])=>{
-    if(!r) return;
-    const b=r.bucket||(r.monster?"monster":null);
-    if(b){ (buckets[b]||(buckets[b]=[])).push(id); return; }
-    if(!r.name) return;
-    (bySheet[r.sheet+"\u0000"+r.name] ||= []).push(Number(r.cell));
-  });
-  const lines=Object.keys(bySheet).sort().map(k=>{
-    const [sh,nm]=k.split("\u0000");
-    return `${sh}/${collapse(bySheet[k])} = ${nm}`;
-  });
-  const names=[...new Set(Object.values(st)
-    .filter(r=>r&&r.name&&isNew(r.name)).map(r=>r.name))].sort();
-  return {lines,names,buckets};
-}
+function buildExport(){ return buildExportFrom(st, rosterSet); }
 function bucketText(buckets){
   const sec=(k,title,note)=>
     `# ${title}  (${buckets[k].length})\n# ${note}\n`
@@ -438,21 +528,293 @@ function dl(text,name){
   downloaded=Object.values(st).filter(r=>r&&!r.monster).length; draw();
 }
 
+/* ---------- confirm ------------------------------------------------------
+   Every action that touches more than the clip on screen goes through here:
+   it says exactly what will happen and how many clips, and does nothing
+   until Enter. Esc cancels with nothing ruled. */
+function ask(q, d, w, run){
+  confirmState={run};
+  $("#cq").textContent=q; $("#cd").textContent=d||""; $("#cw").textContent=w||"";
+  $("#confirm").classList.add("on");
+}
+function closeAsk(){ confirmState=null; $("#confirm").classList.remove("on"); }
+
+/* ---------- merging groups --------------------------------------------------
+   Single-link clustering was tuned NOT to over-merge, so it over-splits: one
+   character can arrive as three groups. Mark one group (*), go to another,
+   merge it in (+). Merges are saved against each group's exact membership, so
+   a rebuilt namer_data.js cannot re-point an old merge (see sig()). */
+function doMerge(srcRoot, dstRoot){
+  if(srcRoot==null||dstRoot==null||srcRoot===dstRoot) return false;
+  if(resolveGroup(dstRoot,into)===srcRoot) return false;          // no cycles
+  merges.push({src:srcRoot, dst:dstRoot,
+    ssig:sig(rawMembers[srcRoot]), dsig:sig(rawMembers[dstRoot])});
+  rebuildInto(); save(); return true;
+}
+function markTarget(){
+  const g=groupOf(cur());
+  if(g==null){ flash("not in a group","var(--accent)"); return; }
+  mergeTarget=g; flash(`group ${g} marked — go to another group and press +`,"var(--new)"); draw();
+}
+function mergeHere(){
+  const g=groupOf(cur());
+  if(g==null){ flash("not in a group","var(--accent)"); return; }
+  if(mergeTarget==null){ flash("mark a target group first with *","var(--accent)"); return; }
+  const t=resolveGroup(mergeTarget,into);
+  if(t===g){ flash("that is the marked group itself","var(--accent)"); return; }
+  const a=members(g).length, b=members(t).length;
+  ask(`Merge group ${g} (${a} clips) into group ${t} (${b} clips)?`,
+      `The result is one group of ${a+b} clips. Nothing is named by merging; `
+      +`name the whole group afterwards with Shift+Enter. _ undoes it.`, "",
+      ()=>{ doMerge(g,t); flash(`merged → group ${t}, ${members(t).length} clips`,"var(--new)"); draw(); });
+}
+function unmergeHere(){
+  const g=groupOf(cur());
+  if(g==null){ flash("not in a group","var(--accent)"); return; }
+  const kids=merges.filter(m=>m.dst===g);
+  if(!kids.length){ flash("nothing was merged into this group","var(--accent)"); return; }
+  ask(`Undo ${kids.length} merge(s) into group ${g}?`,
+      `Those groups become separate again. Names already given stay as they are.`, "",
+      ()=>{ merges=merges.filter(m=>m.dst!==g); rebuildInto(); save(); flash("merges undone","var(--new)"); draw(); });
+}
+
+/* ---------- the wall ----------------------------------------------------------
+   The question at a wall is not "what is this one" but "do any of these
+   belong together". Space selects (any number, across pages), then type ONE
+   name and Enter: a confirm says how many clips, then Enter again. Tab
+   switches between the singleton wall and the group wall; on the group wall
+   + merges the selected groups. Paging rules nothing; leaving rules nothing. */
+const WALLKIND={single:"SINGLETON WALL", group:"GROUP WALL"};
+function wallEntries(){
+  if(wall.kind==="single")
+    return items.filter(x=>groupOf(x)==null&&!st[x.id]).map(x=>({key:x.id, clips:[x]}));
+  const m=new Map();
+  items.forEach(x=>{ const g=groupOf(x); if(g==null) return; if(!m.has(g)) m.set(g,[]); m.get(g).push(x); });
+  return [...m.entries()].filter(([g,mem])=>mem.some(x=>!st[x.id]&&!ejected(x)))
+    .sort((a,b)=>a[0]-b[0]).map(([g,mem])=>({key:"g:"+g, g, clips:mem}));
+}
+function wallSel(){ return wall.sel[wall.kind]; }
+function openWall(kind){
+  wall={kind:kind||"single", cur:0, cols:wall?wall.cols:4, pageSize:12,
+        sel:wall?wall.sel:{single:[],group:[]}, list:[]};
+  typed=""; sel=0;
+  wall.list=wallEntries();
+  if(!wall.list.length){ const k=wall.kind; wall=null; flash(`nothing open for the ${k==="single"?"singleton":"group"} wall`,"var(--accent)"); draw(); return; }
+  layout();
+}
+function leaveWall(){
+  const e=wall.list[wall.cur];
+  wall=null; typed=""; sel=0;
+  if(e){ const x=e.clips.find(c=>!st[c.id])||e.clips[0]; i=items.indexOf(x); }
+  layout();
+}
+function layout(){
+  const on=!!wall;
+  $("#wall").classList.toggle("on",on);
+  $("#frames").style.display=on?"none":"";
+  $("#decide").style.display=on?"none":"";
+  drawKeys(); if(on) drawWall(); else draw();
+}
+function refreshWall(keepKey){
+  const old=keepKey||(wall.list[wall.cur]||{}).key;
+  wall.list=wallEntries();
+  const keys=new Set(wall.list.map(e=>e.key));
+  wall.sel.single=wall.sel.single.filter(k=>keys.has(k)||wall.kind!=="single");
+  wall.sel.group=wall.sel.group.filter(k=>keys.has(k)||wall.kind!=="group");
+  const at=wall.list.findIndex(e=>e.key===old);
+  wall.cur=Math.max(0,Math.min(at>=0?at:wall.cur, wall.list.length-1));
+}
+function wallTargets(){
+  const keys=wallSel().length?wallSel():[(wall.list[wall.cur]||{}).key].filter(Boolean);
+  const ents=keys.map(k=>wall.list.find(e=>e.key===k)).filter(Boolean);
+  const ids=[]; ents.forEach(e=>e.clips.forEach(c=>ids.push(c.id)));
+  return {ents, ids, usedSelection:wallSel().length>0};
+}
+function wallName(name){
+  name=(name||"").toUpperCase().trim().replace(/\s+/g," ");
+  if(!name){ flash("type a name first","var(--accent)"); return; }
+  const {ents,ids,usedSelection}=wallTargets();
+  const {hit,skipped}=bulkSplit(ids, st, ej);
+  if(!hit.length){ flash("nothing open in that selection","var(--accent)"); return; }
+  const near=isNew(name)?nearMisses(name):[];
+  const what=wall.kind==="single"?`${ents.length} singleton(s)`:`${ents.length} group(s)`;
+  ask(`Name ${hit.length} clip(s) → ${name}${isNew(name)?"   (NEW)":""}`,
+      `${usedSelection?"Selected":"Cursor"}: ${what}.`
+      +(skipped.length?`\n${skipped.length} clip(s) already decided or ejected will be skipped.`:""),
+      near.length?`⚠ close to existing: ${near.join(", ")} — Esc and pick one if you meant it`:"",
+      ()=>{
+        hit.forEach(id=>{ const x=byId[id]; st[id]={name,sheet:x.sheet,cell:x.cell}; });
+        lastName=name; save(); typed=""; sel=0;
+        wall.sel[wall.kind]=[];
+        flash(`${name} × ${hit.length}`+(skipped.length?` · skipped ${skipped.length}`:""), isNew(name)?"var(--new)":"var(--green)");
+        refreshWall(); drawWall();
+      });
+}
+function wallBucket(kind){
+  const {ents,ids}=wallTargets();
+  const {hit,skipped}=bulkSplit(ids, st, ej);
+  if(!hit.length){ flash("nothing open in that selection","var(--accent)"); return; }
+  ask(`${BUCKETS[kind].label}: ${hit.length} clip(s)?`,
+      `${ents.length} ${wall.kind==="single"?"singleton(s)":"group(s)"}.`
+      +(skipped.length?`\n${skipped.length} clip(s) already decided or ejected will be skipped.`:""), "",
+      ()=>{
+        hit.forEach(id=>{ const x=byId[id]; st[id]={bucket:kind,sheet:x.sheet,cell:x.cell}; });
+        save(); wall.sel[wall.kind]=[];
+        flash(`${BUCKETS[kind].label} × ${hit.length}`, BUCKETS[kind].colour);
+        refreshWall(); drawWall();
+      });
+}
+function wallMerge(){
+  if(wall.kind!=="group"){ flash("merge works on the group wall — Tab","var(--accent)"); return; }
+  const gs=wallSel().map(k=>Number(k.slice(2)));
+  if(gs.length<2){ flash("select two or more groups first (Space)","var(--accent)"); return; }
+  const t=gs[0], rest=gs.slice(1);
+  const n=gs.reduce((a,g)=>a+members(g).length,0);
+  ask(`Merge ${gs.length} groups into group ${t}?`,
+      `Groups ${gs.join(", ")} → one group of ${n} clips. Nothing is named by merging. `
+      +`Undo from the clip view with _.`, "",
+      ()=>{
+        rest.forEach(g=>doMerge(g,t));
+        wall.sel.group=["g:"+t];
+        flash(`merged → group ${t}, ${members(t).length} clips`,"var(--new)");
+        refreshWall("g:"+t); drawWall();
+      });
+}
+function wallToggle(){
+  const e=wall.list[wall.cur]; if(!e) return;
+  const s=wallSel(), k=s.indexOf(e.key);
+  if(k>=0) s.splice(k,1); else s.push(e.key);
+  drawWall();
+}
+function wallMove(d){
+  const n=wall.list.length; if(!n) return;
+  wall.cur=Math.max(0,Math.min(n-1,wall.cur+d)); drawWall();
+}
+function drawWall(){
+  const L=wall.list, ps=wall.pageSize, page=Math.floor(wall.cur/ps), pages=Math.max(1,Math.ceil(L.length/ps));
+  const s=wallSel(), off=s.filter(k=>{const at=L.findIndex(e=>e.key===k); return Math.floor(at/ps)!==page;}).length;
+  $("#wtitle").textContent=WALLKIND[wall.kind];
+  $("#wsub").textContent=`${L.length} open ${wall.kind==="single"?"singletons":"groups"} · page ${page+1}/${pages} · `
+    +`${s.length} selected${off?` (${off} on other pages)`:""}`;
+  const grid=$("#wgrid"); grid.innerHTML="";
+  grid.style.gridTemplateColumns=`repeat(${wall.cols},minmax(0,1fr))`;
+  L.slice(page*ps,(page+1)*ps).forEach((e,k)=>{
+    const at=page*ps+k, c=E("div","wc"), n=s.indexOf(e.key);
+    if(at===wall.cur) c.classList.add("cur");
+    if(n>=0){ c.classList.add("sel"); c.dataset.n="✓ "+(n+1); }
+    const l=E("div","wl"), a=E("span"), b=E("span");
+    if(wall.kind==="single"){
+      const x=e.clips[0];
+      a.textContent=`${x.sheet}/${String(x.cell).padStart(2,"0")}`;
+      b.textContent=x.nearest?`near ${x.nearest} ${x.distance==null?"":x.distance.toFixed(3)}`:"";
+    }else{
+      const open=e.clips.filter(x=>!st[x.id]&&!ejected(x)).length, mf=mergedFrom(e.g).length;
+      a.textContent=`group ${e.g} · ${e.clips.length} clips`+(mf>1?` · merged ×${mf}`:"");
+      b.textContent=`${open} open`;
+    }
+    l.append(a,b); c.appendChild(l);
+    const f=E("div","wf"+(wall.kind==="group"?" g":""));
+    const srcs=wall.kind==="single"?(e.clips[0].frames||[]).slice(0,3)
+      :e.clips.slice(0,6).map(x=>x.frames[1]||x.frames[0]);
+    srcs.forEach(src=>{ const d=E("div"), im=new Image(); im.src=src; im.alt=""; im.decoding="async";
+      im.onerror=()=>{d.textContent="—";}; d.appendChild(im); f.appendChild(d); });
+    c.appendChild(f);
+    c.onclick=()=>{ wall.cur=at; wallToggle(); };
+    grid.appendChild(c);
+  });
+  /* page size from the space actually available, so cells stay as large as fits */
+  requestAnimationFrame(()=>{
+    if(!wall) return;
+    const first=grid.firstElementChild; if(!first) return;
+    const avail=window.innerHeight-grid.getBoundingClientRect().top-$("#wbar").offsetHeight-$("footer").offsetHeight-24;
+    const rows=Math.max(1,Math.floor((avail+8)/(first.offsetHeight+8)));
+    const want=rows*wall.cols;
+    if(want!==wall.pageSize){ wall.pageSize=want; drawWall(); }
+  });
+  // name bar
+  const t=$("#wtyped");
+  t.innerHTML=typed?`<span style="font:700 22px Consolas">${typed}</span><span class="caret" style="display:inline-block;width:10px;height:1em;background:var(--accent);vertical-align:text-bottom"></span>`
+    :`<span style="color:var(--muted)">Space selects · type ONE name for everything selected · Enter → confirm</span>`;
+  const ws=$("#wsug"); ws.innerHTML=""; $("#wwarn").textContent="";
+  if(typed){
+    const q=typed.toUpperCase(); sug=allNames().filter(nm=>nm.includes(q));
+    if(sel>sug.length) sel=sug.length;
+    sug.slice(0,12).forEach((nm,k)=>{ const sp=E("span",k===sel?"sel":""); sp.textContent=nm;
+      const ii=E("i"); ii.textContent=rosterSet.has(nm)?"roster":"new"; sp.appendChild(ii); ws.appendChild(sp); });
+    if(!allNames().includes(q)){
+      const sp=E("span",(sel>=sug.length)?"sel":""); sp.textContent=q; const ii=E("i"); ii.textContent="CREATE NEW";
+      ii.style.color="var(--new)"; sp.appendChild(ii); ws.appendChild(sp);
+      const near=nearMisses(q); if(near.length) $("#wwarn").textContent="⚠ close to existing: "+near.join(", ");
+    }
+  }
+  const {ids}=wallTargets(); const {hit}=bulkSplit(ids,st,ej);
+  $("#wsel").textContent=s.length?`${s.length} selected → ${hit.length} open clip(s) would be named`
+    :`nothing selected — actions apply to the cursor cell (${hit.length} clip(s))`;
+  // header progress
+  const done=items.filter(x=>st[x.id]).length;
+  $("#bar>div").style.width=(100*done/items.length)+"%";
+  $("#counts").textContent=`${done}/${items.length} named`;
+  $("#where").textContent=WALLKIND[wall.kind];
+}
+function wallKey(e){
+  const k=e.key;
+  if(k==="Enter"){ e.preventDefault(); wallName(pending()||""); return; }
+  if(k==="Tab"){ e.preventDefault(); openWall(wall.kind==="single"?"group":"single"); return; }
+  if(k==="/"){ e.preventDefault(); leaveWall(); return; }
+  if(k==="\\"){ e.preventDefault(); wallBucket("monster"); return; }
+  if(k==="["){ wallBucket("group"); return; }
+  if(k==="]"){ wallBucket("problem"); return; }
+  if(k==="+"){ e.preventDefault(); wallMerge(); return; }
+  if(k==="PageDown"){ e.preventDefault(); wallMove(wall.pageSize); return; }
+  if(k==="PageUp"){ e.preventDefault(); wallMove(-wall.pageSize); return; }
+  if(typed){
+    if(k==="ArrowDown"||k==="ArrowRight"){ e.preventDefault(); sel=Math.min(sel+1,sug.length); drawWall(); return; }
+    if(k==="ArrowUp"||k==="ArrowLeft"){ e.preventDefault(); sel=Math.max(sel-1,0); drawWall(); return; }
+    if(k==="Escape"){ typed=""; sel=0; drawWall(); return; }
+    if(k==="Backspace"){ e.preventDefault(); typed=typed.slice(0,-1); sel=0; drawWall(); return; }
+  }else{
+    if(k==="ArrowRight"){ e.preventDefault(); wallMove(1); return; }
+    if(k==="ArrowLeft"){ e.preventDefault(); wallMove(-1); return; }
+    if(k==="ArrowDown"){ e.preventDefault(); wallMove(wall.cols); return; }
+    if(k==="ArrowUp"){ e.preventDefault(); wallMove(-wall.cols); return; }
+    if(k===" "){ e.preventDefault(); wallToggle(); return; }
+    if(k===","){ wall.cols=Math.max(2,wall.cols-1); drawWall(); return; }
+    if(k==="."){ wall.cols=Math.min(8,wall.cols+1); drawWall(); return; }
+    if(k==="Escape"){ if(wallSel().length){ wall.sel[wall.kind]=[]; flash("selection cleared","var(--muted)"); drawWall(); } return; }
+    if(k==="="){ openEx(); return; }
+    if(k==="`"){ if(lastName) wallName(lastName); else flash("no previous name","var(--accent)"); return; }
+  }
+  if(k.length===1&&/[a-zA-Z0-9 '\-]/.test(k)){ e.preventDefault(); typed+=k.toUpperCase(); sel=0; drawWall(); }
+}
+
 /* ---------- keys ------------------------------------------------------- */
 const KEYS=[["Enter","name THIS clip"],["Shift+Enter","name the whole group"],
   ["Tab","eject this clip from the group"],["↑ ↓","move through matches"],
-  ["`","reuse the last name you used"],["M","not a character"],
+  ["`","reuse the last name you used"],["\\","not a character"],
   ["[ / {","GROUP — several characters (clip / whole group)"],
   ["] / }","PROBLEMATIC — sort later (clip / whole group)"],
   ["→ / ←","skip / back"],
-  ["Del","clear this clip"],["Esc","clear what you typed"],["=","export"]];
-function drawKeys(){ $("#keys").innerHTML=KEYS.map(([k,v])=>
+  ["Del","clear this clip"],["Esc","clear what you typed"],["=","export"],
+  ["/","singleton & group walls"],["*","mark this group as merge target"],["+","merge this group into the marked one"],
+  ["_","undo merges into this group"]];
+const WALLKEYS=[["Space","select / unselect"],["arrows","move"],["PgDn PgUp","page (rules nothing)"],
+  ["type + Enter","name ALL selected → confirm"],["`","last name → confirm"],["\\","not a character"],
+  ["[ / ]","GROUP / PROBLEMATIC bucket"],["+","merge selected groups (group wall)"],["Tab","singletons ↔ groups"],
+  [", .","fewer / more columns"],["Esc","clear typing, then selection"],["/","back to one clip (rules nothing)"],["=","export"]];
+function drawKeys(){ $("#keys").innerHTML=(wall?WALLKEYS:KEYS).map(([k,v])=>
   `<span><kbd>${k}</kbd> ${v}</span>`).join(""); }
 
 document.addEventListener("keydown",e=>{
   if($("#loader").style.display!=="none"&&!D){ if(e.key.toLowerCase()==="o")$("#file").click(); return; }
   if($("#overlay").classList.contains("on")){ if(e.key==="Escape")$("#overlay").classList.remove("on"); return; }
   if(e.ctrlKey||e.altKey||e.metaKey) return;
+  if(confirmState){
+    e.preventDefault();
+    if(e.key==="Enter"){ const r=confirmState.run; closeAsk(); r(); }
+    else if(e.key==="Escape"){ closeAsk(); flash("cancelled — nothing ruled","var(--muted)"); }
+    return;
+  }
+  if(wall){ wallKey(e); return; }
   const k=e.key;
   /* Group commands are NOT letters. Binding G and X would make them
      unreachable inside a name, and GREEN GATOR / YELLOW GECKO are real
@@ -466,6 +828,14 @@ document.addEventListener("keydown",e=>{
   if(k==="{"){ bucketGroup("group"); return; }
   if(k==="]"){ bucket("problem"); return; }
   if(k==="}"){ bucketGroup("problem"); return; }
+  /* "not a character" was M -- a letter, so the first keystroke of MONKEY
+     PRIME or MAGENTA PILOT filed the clip as not-a-character and moved on.
+     Backslash is outside the name charset, like the brackets. */
+  if(k==="\\"){ e.preventDefault(); bucket("monster"); return; }
+  if(k==="/"){ e.preventDefault(); openWall("single"); return; }
+  if(k==="*"){ e.preventDefault(); markTarget(); return; }
+  if(k==="+"){ e.preventDefault(); mergeHere(); return; }
+  if(k==="_"){ e.preventDefault(); unmergeHere(); return; }
   if(k==="ArrowDown"){ e.preventDefault(); sel=Math.min(sel+1,Math.max(sug.length,1)); drawSug(); drawGroup(); return; }
   if(k==="ArrowUp"){ e.preventDefault(); sel=Math.max(sel-1,0); drawSug(); drawGroup(); return; }
   if(k==="Escape"){ typed=""; sel=0; draw(); return; }
@@ -476,7 +846,6 @@ document.addEventListener("keydown",e=>{
     if(k==="Delete"){ clear(); return; }
     if(k==="="){ openEx(); return; }
     if(k==="`"){ if(lastName){assign(lastName);} else flash("no previous name","var(--accent)"); return; }
-    if(k.toLowerCase()==="m"){ bucket("monster"); return; }
   }
   if(k.length===1&&/[a-zA-Z0-9 '\-]/.test(k)){ typed+=k.toUpperCase(); sel=0; drawTyped(); drawSug(); drawGroup(); }
 });
@@ -490,7 +859,10 @@ function boot(data){
   for(const it of items){ const k=it.sheet+"/"+it.cell;
     if(seen.has(k)){ $("#loadmsg").textContent="Duplicate sheet/cell: "+k+". Not loading."; return; }
     seen.add(k); }
+  byId={}; rawMembers={};
+  items.forEach(x=>{ byId[x.id]=x; if(x.group!=null)(rawMembers[x.group]||(rawMembers[x.group]=[])).push(x.id); });
   load();
+  if(droppedMerges) setTimeout(()=>flash(`${droppedMerges} saved merge(s) no longer match the data — not applied`,"var(--accent)"),300);
   const firstOpen=items.findIndex(x=>!st[x.id]);
   i=firstOpen<0?0:firstOpen;
   downloaded=Object.values(st).filter(r=>r&&!r.monster).length;

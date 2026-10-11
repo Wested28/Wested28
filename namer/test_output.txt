@@ -1,0 +1,23 @@
+collapse (same cases as review.html's collapser)
+  ok  [1,2,3,5,9,10] -> 01-03,05,09-10
+  ok  [7] -> 07
+  ok  [1,2,3,4,7,14,18,19,20] -> 01-04,07,14,18-20
+  ok  numeric not lexicographic: [10,9,2,1] -> 01-02,09-10
+  ok  duplicates: [5,5,6] -> 05-06
+  ok  2,000 random sets round-trip
+near-miss guard (the four real invented duplicates)
+  ok  CORAL LYNX -> warns ROSE LYNX (shared word, 4 edits)
+  ok  IVORY MECHA -> warns IVORY LANCER
+  ok  DEATH MAID -> warns ONYX MAID
+  ok  BEAVER -> no warning (no shared word, 8 edits: documented limit)
+  ok  exact roster name is not its own near miss
+bulk actions skip earlier decisions
+  ok  skips named, bucketed and ejected; reports both lists
+merges
+  ok  sig is order-independent and changes when membership changes
+  ok  resolveGroup follows chains; unmerged groups resolve to themselves
+export: wall naming + buckets
+  ok  names from a wall action spanning sheets collapse per sheet; new names listed; buckets separate
+  ok  nothing ruled -> nothing exported
+
+ALL 16 TESTS PASSED
