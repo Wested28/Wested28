@@ -1,0 +1,69 @@
+[HELD] baseline: 40 decided, 5 overridden
+    claim   : whole-batch precision and per-target cuts are right
+    observed: printed 87.5% (independent 87.5%); targets {99: None, 98: None, 95: None} vs independent {99: None, 98: None, 95: None}
+[HELD] 25 clips tied at exactly d = 0.030 (3 wrong), cut rows 0.030 / 0.035
+    claim   : a cut never half-includes a tie; <= includes the tie
+    observed: row 0.030 accepted 35 (want 35), row 0.035 accepted 40 (want 40); targets {99: None, 98: None, 95: None} vs independent {99: None, 98: None, 95: None}
+[HELD] alias ruled against canonical, and canonical against alias (mixed case in the alias map)
+    claim   : a ruling equal to the proposal or its alias counts as correct
+    observed: '0 overridden' in report: True; precision 100.0%
+[HELD] cells spec '01-04,07' and ' 9 - 11 , 13' with a lowercase sheet
+    claim   : expands to the listed cells
+    observed: 'ruled cells : 9' in report: True
+[BUG] reversed range '04-01'
+    claim   : stops, and says why in logs\threshold.md (the house rule: the report file is the record)
+    observed: stops: True; reason printed: only to the console (SystemExit message); in the report file: False. The report ends after its header lines with no error.
+    you'd believe: reading the report off disk: a run that stopped for no stated reason.
+[HELD] cell number beyond the sheet's length (U001/25 on a 20-cell sheet)
+    claim   : refuses to measure against the wrong clips
+    observed: stops with the 'not in this batch' message: True
+[HELD] CRLF line endings
+    claim   : parsed the same as LF
+    observed: 20 cells, 100.0%: True
+[BUG] UTF-8 BOM at the start of the rulings file
+    claim   : parses the first line
+    observed: the BOM sticks to the first sheet code ('\ufeffU001'), that cell looks foreign, and the run stops with 'The rulings and the data file are from different runs'
+    you'd believe: you passed the wrong --data file and go hunting for another. The data file was right.
+[HELD] every ruling 'unknown'
+    claim   : says there is nothing to fit
+    observed: rc=0, 'No decided rulings' printed: True
+[BUG] exactly one decided clip, ruled correct
+    claim   : the precision it prints can be believed
+    observed: prints '**precision on the whole batch: 100.0%**' in bold from ONE clip, with no sample-size caveat; every cut row also reads 100.0%
+    you'd believe: the method is 100% precise. One clip can't say that.
+[BUG] exactly one decided clip, ruled WRONG
+    claim   : reports 0.0%
+    observed: crashes: IndexError at 'distance of CORRECT' (cds[0] on an empty list)
+    you'd believe: no number at all. The run crashes on the batch that matters most.
+[BUG] 25 decided, every one overridden
+    claim   : reports 0% and the override table
+    observed: crashes: IndexError -- same empty-list index as above
+    you'd believe: no measurement of a batch where the method was always wrong.
+[HELD] 99% only reachable by accepting 15 clips (< MIN_ACCEPTED 20)
+    claim   : never reports a cut backed by fewer than 20 clips; the 95% cut it does report is right
+    observed: targets: {99: None, 98: None, 95: (0.04, 95.0, 20)}; independent: {99: None, 98: None, 95: (0.04, 95.0, 20)}
+[BUG] a clip with NO proposal (proposed: null) that you named
+    claim   : measures the precision of PROPOSALS
+    observed: counted as an override: True; precision printed 95.2% instead of 100.0%; it also appears in the overrides table as proposed 'None'
+    you'd believe: the machine got one wrong. It never proposed anything for that clip.
+[BUG] same, with distance: null
+    claim   : skips or reports it
+    observed: crashes: TypeError at float(None)
+    you'd believe: no report at all for the whole batch.
+[BUG] a clip ruled GROUP (review.html key 4) when the proposal named one character
+    claim   : errors are classified by why they happened
+    observed: counted as an override: True; and with 12 GROUP clips in the library it is classed as a 'true in-set confusion ... a better EMBEDDING would have to fix': True
+    you'd believe: the embedding confuses characters. GROUP is a category, not a character.
+[BUG] the same cell ruled twice with different names
+    claim   : every ruling is accounted for
+    observed: the later line silently wins (dict overwrite); no warning that a cell was ruled twice
+    you'd believe: a clean 20-cell file. One cell was contradicted.
+[BUG] a malformed line ('U001-20 = SHARK', a dash for a slash)
+    claim   : every line is used or reported
+    observed: silently dropped: 19 cells read, no count of skipped lines
+    you'd believe: all your rulings were counted.
+[HELD] every clip correct: the cut lands on the batch's largest distance
+    claim   : flags that the cut is the edge of the tested range
+    observed: CENSORED warning printed: True
+
+19 tests: 10 BUG, 9 HELD, 0 harness errors. Script SHA-256 unchanged.

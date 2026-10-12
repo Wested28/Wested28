@@ -1,0 +1,62 @@
+[HELD] baseline: 5 unaddressed clips, --write
+    claim   : appends one new sheet, old entries unchanged, verification passes
+    observed: rc=0, entries 3, new sheet U001_unsheeted.jpg, 'All checks passed' in report: True
+[BUG] CSV saved with a UTF-8 BOM (Excel / PowerShell -Encoding UTF8)
+    claim   : reads the clip ids from the CSV
+    observed: report: 'clips in source : 0' = True; ends 'The source's clips all have addresses.' = True; nothing registered; rc=0
+    you'd believe: all 5 clips already had addresses. They have none, and stay unrulable.
+[BUG] CSV header spelled 'Clip_ID' (or 'clip_id ' with a trailing space)
+    claim   : reads the clip ids or says it could not
+    observed: reads 0 rows, then reports 'The source's clips all have addresses.' = True
+    you'd believe: same as the BOM case: everything is addressed.
+[HELD] duplicate clip ids in the CSV
+    claim   : each clip registered once
+    observed: new sheet holds 5 ids, 5 distinct
+[HELD] 8-char prefix matching two library ids (clip itself unregistered)
+    claim   : refuses it
+    observed: refused with 'prefix resolves to 2 library ids': True; nothing written
+[BUG] 8-char prefix shared by two library ids, ONE of them already registered
+    claim   : refuses a clip whose prefix does not resolve to exactly one library id
+    observed: the other clip is counted as 'already addressed' (the prefix check runs before the ambiguity check) and is neither registered nor listed as refused
+    you'd believe: that clip has an address. Its prefix resolves to two clips, so readers can't resolve it at all.
+[HELD] --code colliding with existing U001 and lowercase u002
+    claim   : never reuses a sheet code
+    observed: new sheet U003_unsheeted.jpg, codes unique: True
+[BUG] --code 7 (a digit, not a letter)
+    claim   : a new sheet gets a cells.txt address
+    observed: wrote sheet code '7001'; review.html's cells.txt parser needs [A-Za-z]+digits, so '7001/01 = X' cannot be imported: grammar ok = False
+    you'd believe: the clips are now rulable. Their address can't be written in the format review.html imports.
+[HELD] --per 1 and --per 999
+    claim   : chunks correctly, old entries untouched
+    observed: --per 1 -> 5 sheets of 1; --per 999 -> 1 sheet of 5
+[HELD] --per 0
+    claim   : nothing written on bad input
+    observed: crashes with ValueError before any backup or write; index unchanged
+[HELD] re-run with the same CSV
+    claim   : a re-run is a no-op
+    observed: index bytes unchanged: True
+[HELD] crash between backup and write (json.dump raises)
+    claim   : index never left half-written
+    observed: index unchanged: True; backup present: True; stray .tmp left behind: True
+[BUG] crash after the write, before verification; then re-run
+    claim   : every write is proven by the verification block
+    observed: file written: True; verification ran: False; the re-run says 'Nothing to register' and verifies nothing
+    you'd believe: after re-running, everything is fine. The written entries were never checked by anything.
+[BUG] read-only cluster_index.json (Linux semantics)
+    claim   : a read-only index is not overwritten
+    observed: written: True; file mode afterwards 0o644 -- the read-only flag is silently gone (os.replace swaps the directory entry). NOT verified on Windows, where os.replace onto a read-only file normally fails with Access denied (a safe crash that leaves a .tmp).
+    you'd believe: on Linux: that the read-only protection held.
+[BUG] an existing entry lists a FULL 12-char id (not an 8-char prefix) and the CSV holds that clip
+    claim   : refuses a clip already registered anywhere
+    observed: pre-check compares 8-char prefixes to the raw ids, so it misses it; the clip is written to a new sheet, then the post-write check FAILS (rc=1) and asks you to restore the backup
+    you'd believe: the safety check caught it, but only after the file was already rewritten.
+[BUG] two --write runs inside the same second
+    claim   : backs up before writing (each run keeps its own backup)
+    observed: backup name has 1-second resolution: 1 .bak file(s); the first backup (the pre-everything state) was overwritten: True
+    you'd believe: that a .bak of the original exists. It now holds the state after run 1.
+[BUG] 'every pre-existing entry is byte-for-byte unchanged'
+    claim   : byte-for-byte
+    observed: the check compares parsed JSON (==), and the file is re-serialised with indent=1, so the old entries' bytes change whenever the original formatting differs. The data is equal; the wording is false.
+    you'd believe: a byte diff of the old file would be empty. It isn't; every line moves.
+
+17 tests: 9 BUG, 8 HELD, 0 harness errors. Script SHA-256 unchanged.
